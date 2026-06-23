@@ -1,36 +1,104 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BeatSwipe
 
-## Getting Started
+TikTok-style beat discovery for artists and producers. Swipe through beats, listen with live waveforms, download, and message producers directly — optimised for mobile.
 
-First, run the development server:
+## Features
+
+- **Swipe feed** — Vertical snap-scroll feed with auto-play and double-tap to like
+- **Live waveform** — Tap the waveform to seek to any point in the track
+- **Discover** — Search beats by title/genre and find producers by name
+- **Messaging** — Realtime DMs with file/audio sharing
+- **Upload** — Upload beats with cover art, background video loop, BPM, key, and genre tags
+- **Profile** — Instagram-style beat grid; tap any tile to preview with playback
+- **Edit profile** — Update display name, bio, and profile photo
+- **Analytics** — Plays, likes, and download counts on your own profile
+- **PWA-ready** — Safe-area support for notch/home-bar devices (iPhone, Android)
+
+## Stack
+
+- **Next.js 15** (App Router + TypeScript)
+- **Tailwind CSS v4** + **shadcn/ui** (dark neon theme)
+- **Framer Motion** (animations)
+- **WaveSurfer.js v7** (animated waveforms with seek)
+- **Supabase** (auth, Postgres, storage, realtime)
+- **Vercel** (deployment)
+
+---
+
+## Setup (5 steps)
+
+### 1. Create a Supabase project
+
+1. Go to [supabase.com](https://supabase.com) → New project
+2. Copy your **Project URL** and **anon key** from Settings → API
+
+### 2. Configure environment variables
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.local.example .env.local
+# Fill in your Supabase URL and anon key
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Run the database migration
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+In the Supabase dashboard → SQL Editor, paste and run the contents of:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+supabase/migrations/001_initial.sql
+```
 
-## Learn More
+### 4. Configure storage buckets
 
-To learn more about Next.js, take a look at the following resources:
+In Supabase → Storage, create these **public** buckets:
+- `beats-audio`
+- `beats-cover`
+- `beats-video`
+- `avatars`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+And one **private** bucket:
+- `message-files`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 5. Enable Google OAuth (optional)
 
-## Deploy on Vercel
+In Supabase → Authentication → Providers → Google:
+- Add your Google OAuth credentials
+- Set redirect URL to `https://your-domain.com/auth/callback`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Running locally
+
+```bash
+npm install
+npm run dev
+# → http://localhost:3000
+```
+
+The feed falls back to 5 demo beats if Supabase isn't connected yet, so the UI is explorable immediately.
+
+---
+
+## Deploying to Vercel
+
+```bash
+npx vercel
+# Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY as environment variables
+```
+
+---
+
+## Key files
+
+| File | Purpose |
+|---|---|
+| `components/feed/BeatCard.tsx` | The core swipeable beat card |
+| `components/feed/BeatFeed.tsx` | Scroll-snap vertical feed container |
+| `components/audio/WaveformPlayer.tsx` | WaveSurfer.js animated waveform |
+| `components/audio/AudioProvider.tsx` | Global audio singleton context |
+| `components/upload/UploadForm.tsx` | Producer beat upload |
+| `components/messages/ChatWindow.tsx` | Realtime DM chat |
+| `hooks/useInteraction.ts` | Like/dislike/download with optimistic UI |
+| `hooks/useSwipeFeed.ts` | IntersectionObserver active card tracking |
+| `proxy.ts` | Auth protection for all app routes |
+| `supabase/migrations/001_initial.sql` | Full database schema |
+| `lib/seed-data.ts` | Demo beats for dev without Supabase |

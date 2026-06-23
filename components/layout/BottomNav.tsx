@@ -1,0 +1,67 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Home, Search, MessageCircle, User, Plus } from 'lucide-react'
+
+export function BottomNav({ username }: { username?: string }) {
+  const pathname = usePathname()
+
+  const isActive = (path: string) => pathname.startsWith(path)
+
+  return (
+    <nav className="fixed bottom-0 inset-x-0 z-50 bg-black/90 backdrop-blur-xl border-t border-white/10 pb-safe">
+      <div className="flex items-center justify-around px-2 h-14 max-w-lg mx-auto">
+
+        {/* Home */}
+        <NavItem href="/feed" active={isActive('/feed')} icon={<Home className="w-6 h-6" />} label="Home" />
+
+        {/* Discover */}
+        <NavItem href="/discover" active={isActive('/discover')} icon={<Search className="w-6 h-6" />} label="Discover" />
+
+        {/* Upload — center button */}
+        <Link href="/upload" className="relative flex items-center justify-center -mt-1">
+          <div className="w-11 h-11 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+            <Plus className="w-5 h-5 text-primary" />
+          </div>
+        </Link>
+
+        {/* Messages */}
+        <NavItem href="/messages" active={isActive('/messages')} icon={<MessageCircle className="w-6 h-6" />} label="Inbox" />
+
+        {/* Profile */}
+        <NavItem
+          href={username ? `/profile/${username}` : '/login'}
+          active={isActive('/profile')}
+          icon={<User className="w-6 h-6" />}
+          label="Me"
+        />
+
+      </div>
+    </nav>
+  )
+}
+
+function NavItem({
+  href,
+  active,
+  icon,
+  label,
+}: {
+  href: string
+  active: boolean
+  icon: React.ReactNode
+  label: string
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex flex-col items-center gap-0.5 px-3 py-1 min-w-[52px] transition-colors ${
+        active ? 'text-white' : 'text-white/50'
+      }`}
+    >
+      <div className={active ? 'drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]' : ''}>{icon}</div>
+      <span className="text-[10px] font-medium">{label}</span>
+    </Link>
+  )
+}
