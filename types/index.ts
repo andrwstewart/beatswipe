@@ -35,6 +35,16 @@ export interface Beat {
   downloads_count: number
   created_at: string
   producer?: Profile
+  // AI analysis fields
+  detailed_description?: string | null
+  recommended_artists?: string[] | null
+  ai_genres?: string[] | null
+  ai_mood?: string | null
+  ai_energy?: number | null
+  ai_key_features?: string[] | null
+  underground_vibe?: number | null
+  ai_analysis?: Record<string, unknown> | null
+  analysis_status?: string | null
 }
 
 export interface Interaction {

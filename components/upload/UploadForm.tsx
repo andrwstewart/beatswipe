@@ -120,19 +120,32 @@ export function UploadForm({ userId }: UploadFormProps) {
       // ── 4. Insert beat record ─────────────────────────────────────────────
       setProgressLabel('Saving beat…')
       const bpmNum = data.bpm ? parseInt(data.bpm, 10) : null
-      const { error: insertError } = await supabase.from('beats').insert({
-        producer_id: userId,
-        title: data.title,
-        bpm: bpmNum,
-        key: data.key || null,
-        description: data.description || null,
-        genre: selectedGenres.length > 0 ? selectedGenres : null,
-        mood: selectedMoods.length > 0 ? selectedMoods : null,
-        audio_url: audioUrlData.publicUrl,
-        cover_url: coverUrl,
-        video_url: videoUrl,
-      })
+      const { data: newBeat, error: insertError } = await supabase
+        .from('beats')
+        .insert({
+          producer_id: userId,
+          title: data.title,
+          bpm: bpmNum,
+          key: data.key || null,
+          description: data.description || null,
+          genre: selectedGenres.length > 0 ? selectedGenres : null,
+          mood: selectedMoods.length > 0 ? selectedMoods : null,
+          audio_url: audioUrlData.publicUrl,
+          cover_url: coverUrl,
+          video_url: videoUrl,
+        })
+        .select('id')
+        .single()
       if (insertError) throw new Error(insertError.message)
+
+      // Fire-and-forget AI analysis — don't block upload success UX
+      if (newBeat?.id) {
+        fetch('/api/beats/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ beatId: newBeat.id }),
+        }).catch(() => {/* analysis is best-effort */})
+      }
 
       setProgress(100)
       setSuccess(true)
