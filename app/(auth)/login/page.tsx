@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,9 +33,9 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center bg-background px-4">
-      <div className="w-full max-w-sm space-y-8">
+      <div className="w-full max-w-sm flex flex-col items-center gap-8">
         {/* Logo */}
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 text-center">
           <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20">
             <Music2 className="w-7 h-7 text-primary" />
           </div>
@@ -45,7 +44,7 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="w-full space-y-4">
           <div className="space-y-1">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -83,13 +82,6 @@ export default function LoginPage() {
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
-
-        <p className="text-center text-sm text-muted-foreground">
-          No account?{' '}
-          <Link href="/signup" className="text-primary hover:underline font-medium">
-            Sign up free
-          </Link>
-        </p>
       </div>
     </div>
   )
