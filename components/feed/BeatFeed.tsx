@@ -14,9 +14,7 @@ function stampBeats(beats: Beat[], seq: { n: number }): LoopBeat[] {
   return beats.map((b) => ({ ...b, _loopKey: `${b.id}__${seq.n++}` }))
 }
 
-const MAX_DISPLAY = 30
 const LOAD_AHEAD = 4
-const CHUNK_SIZE = 10    // beats added per source-loop extension
 
 function ForYouTabs() {
   const [tab, setTab] = useState<'following' | 'foryou'>('foryou')
@@ -136,22 +134,24 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
       const src = sourceRef.current
       if (src.length === 0) return
 
-      // Clamp chunk size to library size so small libraries never produce
-      // intra-chunk duplicates (e.g. 5 beats with CHUNK_SIZE=10 would repeat).
-      const chunkSize = Math.min(CHUNK_SIZE, src.length)
+      // Always add a full loop so every beat appears before any repeat.
+      // sourceIndexRef wraps to 0 after each full pass.
       const start = sourceIndexRef.current % src.length
       const chunk: Beat[] = []
-      for (let i = 0; i < chunkSize; i++) {
+      for (let i = 0; i < src.length; i++) {
         chunk.push(src[(start + i) % src.length])
       }
-      sourceIndexRef.current = (start + chunkSize) % src.length
+      sourceIndexRef.current = 0
 
       const stamped = stampBeats(chunk, seq.current)
 
       setDisplay((prev) => {
         const next = [...prev, ...stamped]
-        if (next.length > MAX_DISPLAY) {
-          const trim = next.length - MAX_DISPLAY
+        // Keep at most 2 full loops in the DOM; trim by exactly one loop
+        // so we never cut through the middle of a cycle.
+        const maxDisplay = src.length * 2
+        if (next.length > maxDisplay) {
+          const trim = next.length - maxDisplay
           pendingJumpRef.current = Math.max(0, activeIndexRef.current - trim)
           return next.slice(trim)
         }
