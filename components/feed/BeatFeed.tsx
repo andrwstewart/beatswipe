@@ -16,7 +16,6 @@ function stampBeats(beats: Beat[], seq: { n: number }): LoopBeat[] {
 
 const MAX_DISPLAY = 30
 const LOAD_AHEAD = 4
-const INITIAL_SIZE = 10  // beats per copy in the initial display
 const CHUNK_SIZE = 10    // beats added per source-loop extension
 
 function ForYouTabs() {
@@ -57,20 +56,14 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
   // API has no more pages.
   const sourceRef = useRef<Beat[]>(initialBeats)
 
-  // Display starts with two small copies so there's always a card below.
-  // Using a slice (not all beats) keeps the initial render fast even when
-  // initialBeats is very large; the rest surfaces through source-loop extends.
-  const [display, setDisplay] = useState<LoopBeat[]>(() => {
-    const initial = initialBeats.slice(0, INITIAL_SIZE)
-    return [
-      ...stampBeats(initial, seq.current),
-      ...stampBeats(initial, seq.current),
-    ]
-  })
+  // Start with every beat so the user sees the full library before any repeat.
+  const [display, setDisplay] = useState<LoopBeat[]>(() =>
+    stampBeats(initialBeats, seq.current)
+  )
 
-  // Tracks our position in sourceRef so each extension advances through all
-  // beats in order before wrapping — every beat is guaranteed to appear.
-  const sourceIndexRef = useRef(0)
+  // Start after the initial display so the first extension continues from
+  // where we left off rather than replaying beat 0 again.
+  const sourceIndexRef = useRef(initialBeats.length)
 
   const extendingRef = useRef(false)
   const [displayVersion, setDisplayVersion] = useState(0)
@@ -143,14 +136,15 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
       const src = sourceRef.current
       if (src.length === 0) return
 
-      // Cycle through every beat in sourceRef in CHUNK_SIZE steps before
-      // wrapping — this guarantees every uploaded beat surfaces.
+      // Clamp chunk size to library size so small libraries never produce
+      // intra-chunk duplicates (e.g. 5 beats with CHUNK_SIZE=10 would repeat).
+      const chunkSize = Math.min(CHUNK_SIZE, src.length)
       const start = sourceIndexRef.current % src.length
       const chunk: Beat[] = []
-      for (let i = 0; i < CHUNK_SIZE; i++) {
+      for (let i = 0; i < chunkSize; i++) {
         chunk.push(src[(start + i) % src.length])
       }
-      sourceIndexRef.current = (start + CHUNK_SIZE) % src.length
+      sourceIndexRef.current = (start + chunkSize) % src.length
 
       const stamped = stampBeats(chunk, seq.current)
 
