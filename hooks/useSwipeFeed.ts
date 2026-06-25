@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export function useSwipeFeed(count: number) {
+export function useSwipeFeed(count: number, version = 0) {
   const [activeIndex, setActiveIndex] = useState(0)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
 
@@ -31,7 +31,7 @@ export function useSwipeFeed(count: number) {
     })
 
     return () => observer.disconnect()
-  }, [count])
+  }, [count, version])
 
   const setCardRef = useCallback((index: number) => (el: HTMLDivElement | null) => {
     cardRefs.current[index] = el

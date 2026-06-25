@@ -73,6 +73,7 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
   const sourceIndexRef = useRef(0)
 
   const extendingRef = useRef(false)
+  const [displayVersion, setDisplayVersion] = useState(0)
 
   // Index to scroll to after the next DOM paint (used when we trim the front).
   const pendingJumpRef = useRef<number | null>(null)
@@ -81,7 +82,7 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
   // has a fresh value when it schedules a trim.
   const activeIndexRef = useRef(0)
 
-  const { activeIndex, setCardRef, scrollTo } = useSwipeFeed(display.length)
+  const { activeIndex, setCardRef, scrollTo } = useSwipeFeed(display.length, displayVersion)
   const { play } = useAudio()
 
   const playStartRef = useRef<number | null>(null)
@@ -162,6 +163,10 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
         }
         return next
       })
+      // Bump version so useSwipeFeed re-attaches the IntersectionObserver to
+      // the new card elements — without this, count stays the same after a
+      // trim+add and the observer never sees the fresh DOM nodes.
+      setDisplayVersion((v) => v + 1)
     } finally {
       extendingRef.current = false
     }
