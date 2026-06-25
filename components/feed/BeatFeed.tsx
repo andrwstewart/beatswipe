@@ -72,10 +72,6 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
   // beats in order before wrapping — every beat is guaranteed to appear.
   const sourceIndexRef = useRef(0)
 
-  const [apiPage, setApiPage] = useState(1)
-  const [hasMoreApi, setHasMoreApi] = useState(initialBeats.length >= 10)
-  // Ref (not state) so the guard inside extendFeed always sees the live value
-  // regardless of closure staleness.
   const extendingRef = useRef(false)
 
   // Index to scroll to after the next DOM paint (used when we trim the front).
@@ -138,53 +134,25 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
     }
   }, [activeIndex, display.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const extendFeed = useCallback(async () => {
+  const extendFeed = useCallback(() => {
     if (extendingRef.current) return
     extendingRef.current = true
 
     try {
-      let incoming: Beat[] = []
+      const src = sourceRef.current
+      if (src.length === 0) return
 
-      // 1. Try to get a fresh page from the personalized feed API.
-      if (hasMoreApi) {
-        try {
-          const res = await fetch(`/api/beats/feed?page=${apiPage}`)
-          if (res.ok) {
-            const { beats: fresh, hasMore } = await res.json()
-            if (Array.isArray(fresh) && fresh.length > 0) {
-              incoming = fresh
-              sourceRef.current = [
-                ...sourceRef.current,
-                ...fresh.filter((b: Beat) => !sourceRef.current.some((s) => s.id === b.id)),
-              ]
-              setApiPage((p) => p + 1)
-              if (!hasMore) setHasMoreApi(false)
-            }
-          }
-        } catch {
-          // Network error — fall through to loop.
-        }
+      // Cycle through every beat in sourceRef in CHUNK_SIZE steps before
+      // wrapping — this guarantees every uploaded beat surfaces.
+      const start = sourceIndexRef.current % src.length
+      const chunk: Beat[] = []
+      for (let i = 0; i < CHUNK_SIZE; i++) {
+        chunk.push(src[(start + i) % src.length])
       }
+      sourceIndexRef.current = (start + CHUNK_SIZE) % src.length
 
-      // 2. If the API gave nothing, cycle through sourceRef in chunks so every
-      //    beat surfaces before we wrap around. This ensures all uploaded beats
-      //    appear rather than the same first N repeating forever.
-      if (incoming.length === 0) {
-        const src = sourceRef.current
-        if (src.length > 0) {
-          const start = sourceIndexRef.current % src.length
-          const chunk: Beat[] = []
-          for (let i = 0; i < CHUNK_SIZE; i++) {
-            chunk.push(src[(start + i) % src.length])
-          }
-          incoming = chunk
-          sourceIndexRef.current = (start + CHUNK_SIZE) % src.length
-        }
-      }
+      const stamped = stampBeats(chunk, seq.current)
 
-      const stamped = stampBeats(incoming, seq.current)
-
-      // 3. Append and optionally trim the front to keep the DOM bounded.
       setDisplay((prev) => {
         const next = [...prev, ...stamped]
         if (next.length > MAX_DISPLAY) {
@@ -197,7 +165,7 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
     } finally {
       extendingRef.current = false
     }
-  }, [hasMoreApi, apiPage]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, []) // sourceRef and sourceIndexRef are refs — always fresh
 
   if (display.length === 0) {
     return (
