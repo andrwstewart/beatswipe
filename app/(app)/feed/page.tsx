@@ -16,10 +16,16 @@ export default async function FeedPage() {
   const { data: beats } = await supabase
     .from('beats')
     .select('*, producer:profiles(*)')
-    .order('created_at', { ascending: false })
-    .limit(10)
 
-  const initialBeats: Beat[] = beats && beats.length > 0 ? (beats as Beat[]) : DEMO_BEATS
+  // Shuffle on the server so every page load gives a different order
+  const all: Beat[] = beats && beats.length > 0 ? (beats as Beat[]) : DEMO_BEATS
+  const shuffled = [...all]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  const initialBeats = shuffled
 
   return <BeatFeed initialBeats={initialBeats} userId={user.id} />
 }

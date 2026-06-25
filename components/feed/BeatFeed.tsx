@@ -14,11 +14,10 @@ function stampBeats(beats: Beat[], seq: { n: number }): LoopBeat[] {
   return beats.map((b) => ({ ...b, _loopKey: `${b.id}__${seq.n++}` }))
 }
 
-// Max items kept in the DOM at once. Trimming from the front is invisible
-// because we do an instant scrollIntoView after the DOM updates.
 const MAX_DISPLAY = 30
-// Append a new batch when this many items remain below the current card.
 const LOAD_AHEAD = 4
+const INITIAL_SIZE = 10  // beats per copy in the initial display
+const CHUNK_SIZE = 10    // beats added per source-loop extension
 
 function ForYouTabs() {
   const [tab, setTab] = useState<'following' | 'foryou'>('foryou')
@@ -58,12 +57,20 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
   // API has no more pages.
   const sourceRef = useRef<Beat[]>(initialBeats)
 
-  // The display buffer starts with two copies so there is always something
-  // below the first card to swipe to.
-  const [display, setDisplay] = useState<LoopBeat[]>(() => [
-    ...stampBeats(initialBeats, seq.current),
-    ...stampBeats(initialBeats, seq.current),
-  ])
+  // Display starts with two small copies so there's always a card below.
+  // Using a slice (not all beats) keeps the initial render fast even when
+  // initialBeats is very large; the rest surfaces through source-loop extends.
+  const [display, setDisplay] = useState<LoopBeat[]>(() => {
+    const initial = initialBeats.slice(0, INITIAL_SIZE)
+    return [
+      ...stampBeats(initial, seq.current),
+      ...stampBeats(initial, seq.current),
+    ]
+  })
+
+  // Tracks our position in sourceRef so each extension advances through all
+  // beats in order before wrapping — every beat is guaranteed to appear.
+  const sourceIndexRef = useRef(0)
 
   const [apiPage, setApiPage] = useState(1)
   const [hasMoreApi, setHasMoreApi] = useState(initialBeats.length >= 10)
@@ -159,9 +166,20 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
         }
       }
 
-      // 2. If the API gave nothing, loop back through everything we've seen.
+      // 2. If the API gave nothing, cycle through sourceRef in chunks so every
+      //    beat surfaces before we wrap around. This ensures all uploaded beats
+      //    appear rather than the same first N repeating forever.
       if (incoming.length === 0) {
-        incoming = sourceRef.current
+        const src = sourceRef.current
+        if (src.length > 0) {
+          const start = sourceIndexRef.current % src.length
+          const chunk: Beat[] = []
+          for (let i = 0; i < CHUNK_SIZE; i++) {
+            chunk.push(src[(start + i) % src.length])
+          }
+          incoming = chunk
+          sourceIndexRef.current = (start + CHUNK_SIZE) % src.length
+        }
       }
 
       const stamped = stampBeats(incoming, seq.current)
