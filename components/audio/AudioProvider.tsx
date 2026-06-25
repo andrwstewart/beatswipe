@@ -17,18 +17,32 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const registerPlayer = useCallback(
     (beatId: string, callbacks: { play: () => void; pause: () => void }) => {
-      playerCallbacks.current.set(beatId, callbacks)
-      return () => playerCallbacks.current.delete(beatId)
+      // Store a stable object reference so the cleanup below can check
+      // whether a newer instance has since taken over this slot.
+      const entry = callbacks
+      playerCallbacks.current.set(beatId, entry)
+      return () => {
+        // Only remove if this exact registration is still the current one.
+        // If a later mount of the same beatId has overwritten the slot,
+        // leave it alone — deleting it would silence the still-visible copy.
+        if (playerCallbacks.current.get(beatId) === entry) {
+          playerCallbacks.current.delete(beatId)
+        }
+      }
     },
     []
   )
 
   const play = useCallback((beatId: string) => {
-    // Pause currently active player
+    // Pause currently active player via its registered callback.
+    // We do NOT call the new beat's play() callback here — each WaveformPlayer
+    // drives its own wavesurfer directly via its isActive prop. Calling the
+    // callback would risk playing the wrong instance when the same beat appears
+    // at multiple positions in the loop (the registered slot always holds the
+    // LAST instance to mount, not necessarily the one on screen).
     if (activeBeatId && activeBeatId !== beatId) {
       playerCallbacks.current.get(activeBeatId)?.pause()
     }
-    playerCallbacks.current.get(beatId)?.play()
     setActiveBeatId(beatId)
   }, [activeBeatId])
 

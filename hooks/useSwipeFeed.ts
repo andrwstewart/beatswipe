@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 export function useSwipeFeed(count: number) {
   const [activeIndex, setActiveIndex] = useState(0)
-  const containerRef = useRef<HTMLDivElement | null>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
 
   // Keep refs array sized to count
@@ -38,6 +37,12 @@ export function useSwipeFeed(count: number) {
     cardRefs.current[index] = el
   }, [])
 
+  // Instant-jump (used after trimming from front to keep the visible card stable)
+  const scrollTo = useCallback((index: number, behavior: ScrollBehavior = 'smooth') => {
+    const target = cardRefs.current[Math.max(0, index)]
+    if (target) target.scrollIntoView({ behavior, block: 'start' })
+  }, [])
+
   const scrollToNext = useCallback(() => {
     const nextIndex = Math.min(activeIndex + 1, count - 1)
     cardRefs.current[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -48,5 +53,5 @@ export function useSwipeFeed(count: number) {
     cardRefs.current[prevIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [activeIndex])
 
-  return { activeIndex, containerRef, setCardRef, scrollToNext, scrollToPrev }
+  return { activeIndex, setCardRef, scrollTo, scrollToNext, scrollToPrev }
 }

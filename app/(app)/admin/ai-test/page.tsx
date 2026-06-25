@@ -3,27 +3,34 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type Panel = 'analyzer' | 'knowledge' | 'status'
+type Panel = 'analyzer' | 'knowledge' | 'status' | 'embeddings'
 
 export default function AITestPage() {
   const [activePanel, setActivePanel] = useState<Panel>('analyzer')
 
+  const panels: { id: Panel; label: string }[] = [
+    { id: 'analyzer', label: 'Beat Analyzer' },
+    { id: 'knowledge', label: 'Knowledge Search' },
+    { id: 'status', label: 'Status Overview' },
+    { id: 'embeddings', label: 'Embeddings' },
+  ]
+
   return (
-    <div className="min-h-dvh p-4 pt-16" style={{ paddingTop: 'calc(4rem + env(safe-area-inset-top, 0px))' }}>
+    <div className="min-h-dvh p-4" style={{ paddingTop: 'calc(4rem + env(safe-area-inset-top, 0px))' }}>
       <h1 className="text-xl font-bold mb-4 text-primary">AI Debug Panel</h1>
 
       <div className="flex gap-2 mb-6 flex-wrap">
-        {(['analyzer', 'knowledge', 'status'] as Panel[]).map((p) => (
+        {panels.map(({ id, label }) => (
           <button
-            key={p}
-            onClick={() => setActivePanel(p)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all capitalize ${
-              activePanel === p
+            key={id}
+            onClick={() => setActivePanel(id)}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${
+              activePanel === id
                 ? 'border-primary bg-primary/15 text-primary'
                 : 'border-border text-muted-foreground'
             }`}
           >
-            {p === 'analyzer' ? 'Beat Analyzer' : p === 'knowledge' ? 'Knowledge Search' : 'Status Overview'}
+            {label}
           </button>
         ))}
       </div>
@@ -31,6 +38,7 @@ export default function AITestPage() {
       {activePanel === 'analyzer' && <BeatAnalyzerPanel />}
       {activePanel === 'knowledge' && <KnowledgeSearchPanel />}
       {activePanel === 'status' && <StatusOverviewPanel />}
+      {activePanel === 'embeddings' && <EmbeddingsPanel />}
     </div>
   )
 }
@@ -233,6 +241,150 @@ function StatusOverviewPanel() {
                   </tr>
                 )
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type EmbedBeatRow = {
+  id: string
+  title: string
+  analysis_status: string | null
+  hasEmbedding: boolean
+  embedStatus: 'idle' | 'loading' | 'done' | 'error'
+  embedError?: string
+}
+
+function EmbeddingsPanel() {
+  const [loading, setLoading] = useState(false)
+  const [rows, setRows] = useState<EmbedBeatRow[]>([])
+  const [fetched, setFetched] = useState(false)
+
+  async function loadBeats() {
+    setLoading(true)
+    const supabase = createClient()
+
+    // Fetch beat list and which IDs have embeddings in parallel
+    const [{ data: beatList }, { data: embeddedList }] = await Promise.all([
+      supabase
+        .from('beats')
+        .select('id, title, analysis_status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('beats')
+        .select('id')
+        .not('audio_embedding', 'is', null)
+        .limit(200),
+    ])
+
+    const embeddedIds = new Set((embeddedList ?? []).map((r: { id: string }) => r.id))
+
+    setRows(
+      (beatList ?? []).map((b: { id: string; title: string; analysis_status: string | null }) => ({
+        id: b.id,
+        title: b.title,
+        analysis_status: b.analysis_status,
+        hasEmbedding: embeddedIds.has(b.id),
+        embedStatus: 'idle' as const,
+      }))
+    )
+    setFetched(true)
+    setLoading(false)
+  }
+
+  async function generateEmbedding(beatId: string) {
+    setRows((prev) =>
+      prev.map((r) => (r.id === beatId ? { ...r, embedStatus: 'loading', embedError: undefined } : r))
+    )
+    try {
+      const res = await fetch('/api/ai/generate-embedding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ beatId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed')
+      setRows((prev) =>
+        prev.map((r) => (r.id === beatId ? { ...r, embedStatus: 'done', hasEmbedding: true } : r))
+      )
+    } catch (err) {
+      setRows((prev) =>
+        prev.map((r) =>
+          r.id === beatId ? { ...r, embedStatus: 'error', embedError: String(err) } : r
+        )
+      )
+    }
+  }
+
+  const withEmbedding = rows.filter((r) => r.hasEmbedding).length
+  const total = rows.length
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm text-muted-foreground">
+            Generate audio embeddings for beats. Used for sonic similarity in the feed.
+          </p>
+          {fetched && (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {withEmbedding}/{total} beats have embeddings
+            </p>
+          )}
+        </div>
+        <button
+          onClick={loadBeats}
+          disabled={loading}
+          className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium disabled:opacity-50"
+        >
+          {loading ? 'Loading…' : fetched ? 'Refresh' : 'Load'}
+        </button>
+      </div>
+
+      {fetched && rows.length > 0 && (
+        <div className="overflow-auto rounded-xl border border-border">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border bg-secondary/30">
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Title</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Analysis</th>
+                <th className="text-center px-3 py-2 font-medium text-muted-foreground">Embedding</th>
+                <th className="text-center px-3 py-2 font-medium text-muted-foreground">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-b border-border/40 hover:bg-secondary/20">
+                  <td className="px-3 py-2 max-w-[150px] truncate">{row.title}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{row.analysis_status ?? 'pending'}</td>
+                  <td className="px-3 py-2 text-center">
+                    {row.embedStatus === 'loading' ? (
+                      <span className="text-yellow-400">generating…</span>
+                    ) : row.embedStatus === 'done' || row.hasEmbedding ? (
+                      <span className="text-green-400">✓</span>
+                    ) : row.embedStatus === 'error' ? (
+                      <span className="text-red-400" title={row.embedError}>error</span>
+                    ) : (
+                      <span className="text-muted-foreground/40">—</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    {!row.hasEmbedding && row.embedStatus !== 'done' && (
+                      <button
+                        onClick={() => generateEmbedding(row.id)}
+                        disabled={row.embedStatus === 'loading'}
+                        className="px-2 py-1 rounded bg-primary/15 text-primary text-xs font-medium border border-primary/30 disabled:opacity-40"
+                      >
+                        {row.embedStatus === 'loading' ? '…' : 'Embed'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

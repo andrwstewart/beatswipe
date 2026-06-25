@@ -56,12 +56,11 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center gap-0.5 px-3 py-1 min-w-[52px] transition-colors ${
-        active ? 'text-white' : 'text-white/50'
-      }`}
+      className="flex flex-col items-center gap-0.5 px-3 py-1 min-w-[52px] text-white/60 transition-colors"
     >
-      <div className={active ? 'drop-shadow-[0_0_6px_rgba(255,255,255,0.8)]' : ''}>{icon}</div>
+      {icon}
       <span className="text-[10px] font-medium">{label}</span>
+      {active && <span className="w-1 h-1 rounded-full bg-white/60 mt-0.5" />}
     </Link>
   )
 }

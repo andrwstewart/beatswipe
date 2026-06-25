@@ -5,12 +5,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Heart, MessageCircle, Bookmark, Download, Share2,
+  Heart, MessageCircle, Download, Share2,
   Play, Pause, Plus, Music2,
 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { WaveformPlayer } from '@/components/audio/WaveformPlayer'
-import { CollabPrompt } from '@/components/layout/CollabPrompt'
 import { useAudio } from '@/hooks/useAudio'
 import { useInteraction } from '@/hooks/useInteraction'
 import type { Beat } from '@/types'
@@ -25,25 +24,15 @@ interface BeatCardProps {
 export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
   const { play, pause, isPlaying } = useAudio()
   const playing = isPlaying(beat.id)
-  const [showCollabPrompt, setShowCollabPrompt] = useState(false)
   const [showHeart, setShowHeart] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
-  const interactionCount = useRef(0)
   const lastTap = useRef(0)
-
-  const handleCollabPrompt = useCallback(() => {
-    interactionCount.current += 1
-    if (interactionCount.current >= 2) {
-      setShowCollabPrompt(true)
-      interactionCount.current = 0
-    }
-  }, [])
 
   const interaction = useInteraction({
     beatId: beat.id,
     userId,
+    producerId: beat.producer_id,
     initialLikesCount: beat.likes_count,
-    onCollabPrompt: handleCollabPrompt,
   })
 
   const togglePlay = useCallback(() => {
@@ -143,53 +132,44 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
 
       {/* ── Right side actions ─────────────────────────────────────────── */}
       <div
-        className="absolute right-3 z-20 flex flex-col items-center gap-5"
+        className="absolute right-3 z-20 flex flex-col items-center gap-4"
         style={{ bottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Producer avatar with follow + */}
+        {/* Producer avatar */}
         <Link href={`/profile/${producerUsername}`} className="relative mb-1">
-          <Avatar className="w-12 h-12 border border-white/40">
-            <AvatarImage src={beat.producer?.avatar_url ?? undefined} />
-            <AvatarFallback className="bg-primary/20 text-primary font-bold text-sm">
-              {producerName[0]?.toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-primary/80 rounded-full flex items-center justify-center">
-            <Plus className="w-2.5 h-2.5 text-black" strokeWidth={2} />
+          <div className="w-11 h-11 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/20 overflow-hidden">
+            <Avatar className="w-full h-full">
+              <AvatarImage src={beat.producer?.avatar_url ?? undefined} />
+              <AvatarFallback className="bg-primary/30 text-primary font-bold text-sm">
+                {producerName[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+            <Plus className="w-2.5 h-2.5 text-black" strokeWidth={3} />
           </div>
         </Link>
 
         {/* Like */}
         <SideAction
-          icon={<Heart className={`w-7 h-7 ${interaction.liked ? 'fill-rose-500 text-rose-500' : 'text-white'}`} />}
+          icon={<Heart className={`w-7 h-7 ${interaction.liked ? 'fill-rose-500 text-rose-500' : 'text-white/70'}`} />}
           label={fmtCount(interaction.likesCount)}
           onClick={interaction.like}
           active={interaction.liked}
         />
 
-        {/* Comments / Message producer */}
-        <Link
-          href={`/messages/new?producer=${producerUsername}`}
-          className="flex flex-col items-center gap-1"
-        >
+        {/* Message producer */}
+        <Link href={`/messages/new?producer=${producerUsername}`} className="flex flex-col items-center gap-1">
           <div className="p-1">
-            <MessageCircle className="w-7 h-7 text-white" />
+            <MessageCircle className="w-7 h-7 text-white/70" />
           </div>
-          <span className="text-white text-xs font-semibold drop-shadow">Message</span>
+          <span className="text-white/70 text-xs font-semibold drop-shadow">Message</span>
         </Link>
-
-        {/* Save / Bookmark */}
-        <SideAction
-          icon={<Bookmark className={`w-7 h-7 ${interaction.favorited ? 'fill-yellow-400 text-yellow-400' : 'text-white'}`} />}
-          label="Save"
-          onClick={interaction.favorite}
-          active={interaction.favorited}
-        />
 
         {/* Download */}
         <SideAction
-          icon={<Download className={`w-6 h-6 ${interaction.downloaded ? 'text-primary' : 'text-white'}`} />}
+          icon={<Download className={`w-6 h-6 ${interaction.downloaded ? 'text-primary' : 'text-white/70'}`} />}
           label={fmtCount(beat.downloads_count)}
           onClick={() => interaction.download(beat.audio_url, beat.title)}
           active={interaction.downloaded}
@@ -197,14 +177,14 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
 
         {/* Share */}
         <SideAction
-          icon={<Share2 className="w-6 h-6 text-white" />}
+          icon={<Share2 className="w-6 h-6 text-white/70" />}
           label="Share"
           onClick={handleShare}
           active={false}
         />
 
-        {/* Spinning music disc */}
-        <SpinningDisc coverUrl={beat.cover_url} isPlaying={playing} />
+        {/* Spinning disc — producer avatar */}
+        <SpinningDisc avatarUrl={beat.producer?.avatar_url ?? null} isPlaying={playing} />
       </div>
 
       {/* ── Bottom left: producer + beat info + waveform ───────────────── */}
@@ -274,14 +254,6 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
         </div>
       </div>
 
-      {/* Collab prompt */}
-      <CollabPrompt
-        open={showCollabPrompt}
-        onClose={() => setShowCollabPrompt(false)}
-        producerUsername={producerUsername}
-        producerName={producerName}
-        beatTitle={beat.title}
-      />
     </div>
   )
 }
@@ -302,27 +274,27 @@ function SideAction({
       className="flex flex-col items-center gap-1"
     >
       <div className={`p-1 transition-transform ${active ? 'scale-110' : ''}`}>{icon}</div>
-      <span className="text-white text-xs font-semibold drop-shadow">{label}</span>
+      <span className="text-white/70 text-xs font-semibold drop-shadow">{label}</span>
     </motion.button>
   )
 }
 
-// ── Spinning music disc ───────────────────────────────────────────────────────
-function SpinningDisc({ coverUrl, isPlaying }: { coverUrl: string | null; isPlaying: boolean }) {
+// ── Spinning disc — producer avatar ──────────────────────────────────────────
+function SpinningDisc({ avatarUrl, isPlaying }: { avatarUrl: string | null; isPlaying: boolean }) {
   return (
-    <div className={`mt-1 w-10 h-10 rounded-full border-4 border-zinc-700 bg-zinc-800 overflow-hidden shadow-lg ${isPlaying ? 'animate-spin' : ''}`}
-      style={{ animationDuration: '3s' }}
+    <div
+      className={`mt-1 w-10 h-10 rounded-full border-2 border-white/20 bg-zinc-800 overflow-hidden shadow-lg relative ${isPlaying ? 'animate-spin' : ''}`}
+      style={{ animationDuration: '4s' }}
     >
-      {coverUrl ? (
-        <Image src={coverUrl} alt="disc" width={40} height={40} className="w-full h-full object-cover" />
+      {avatarUrl ? (
+        <Image src={avatarUrl} alt="producer" fill className="object-cover" sizes="40px" />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
           <Music2 className="w-4 h-4 text-white/60" />
         </div>
       )}
-      {/* Centre hole */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-3 h-3 rounded-full bg-zinc-900 border border-zinc-700" />
+        <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 border border-white/20" />
       </div>
     </div>
   )

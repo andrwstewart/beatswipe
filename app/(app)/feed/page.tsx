@@ -13,14 +13,13 @@ export default async function FeedPage() {
 
   if (!user) redirect('/login')
 
-  // Try to fetch from Supabase; fall back to demo data in dev
   const { data: beats } = await supabase
     .from('beats')
     .select('*, producer:profiles(*)')
     .order('created_at', { ascending: false })
     .limit(10)
 
-  const feedBeats: Beat[] = beats && beats.length > 0 ? (beats as Beat[]) : DEMO_BEATS
+  const initialBeats: Beat[] = beats && beats.length > 0 ? (beats as Beat[]) : DEMO_BEATS
 
-  return <BeatFeed initialBeats={feedBeats} userId={user.id} />
+  return <BeatFeed initialBeats={initialBeats} userId={user.id} />
 }

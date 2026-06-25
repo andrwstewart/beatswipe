@@ -25,6 +25,7 @@ export interface Beat {
   key: string | null
   genre: string[] | null
   mood: string[] | null
+  type_beat_tags?: string[] | null
   description: string | null
   audio_url: string
   cover_url: string | null

@@ -2,11 +2,13 @@
 
 import { useCallback, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { sendDownloadMessage } from '@/lib/sendDownloadMessage'
 import type { InteractionType } from '@/types'
 
 interface UseInteractionOptions {
   beatId: string
   userId: string
+  producerId?: string
   initialLiked?: boolean
   initialFavorited?: boolean
   initialDownloaded?: boolean
@@ -17,6 +19,7 @@ interface UseInteractionOptions {
 export function useInteraction({
   beatId,
   userId,
+  producerId,
   initialLiked = false,
   initialFavorited = false,
   initialDownloaded = false,
@@ -135,6 +138,7 @@ export function useInteraction({
         setDownloaded(true)
         await upsertInteraction('download')
         onCollabPrompt?.()
+        if (producerId) sendDownloadMessage(userId, producerId).catch(() => {})
       } catch (err) {
         console.error('Download failed', err)
       } finally {

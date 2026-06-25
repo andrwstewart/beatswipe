@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Upload, Music2, Image as ImageIcon, Video, X, Check } from 'lucide-react'
-import { GENRES, KEYS, MOODS, type Genre, type Mood } from '@/types'
+import { KEYS } from '@/types'
+import { TypeBeatSelector } from '@/components/upload/TypeBeatSelector'
 
 type FormData = {
   title: string
@@ -29,8 +30,8 @@ export function UploadForm({ userId }: UploadFormProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
-  const [selectedGenres, setSelectedGenres] = useState<Genre[]>([])
-  const [selectedMoods, setSelectedMoods] = useState<Mood[]>([])
+  const [typeBeatTags, setTypeBeatTags] = useState<string[]>([])
+  const [typeBeatError, setTypeBeatError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
@@ -53,20 +54,13 @@ export function UploadForm({ userId }: UploadFormProps) {
     setVideoPreview(URL.createObjectURL(file))
   }
 
-  function toggleGenre(g: Genre) {
-    setSelectedGenres((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g].slice(0, 3)
-    )
-  }
-
-  function toggleMood(m: Mood) {
-    setSelectedMoods((prev) =>
-      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].slice(0, 3)
-    )
-  }
-
   async function onSubmit(data: FormData) {
     if (!audioFile) return
+    if (typeBeatTags.length === 0) {
+      setTypeBeatError('Add at least one Type Beat tag before uploading.')
+      return
+    }
+    setTypeBeatError(null)
     setUploading(true)
     setError(null)
     setProgress(5)
@@ -128,8 +122,7 @@ export function UploadForm({ userId }: UploadFormProps) {
           bpm: bpmNum,
           key: data.key || null,
           description: data.description || null,
-          genre: selectedGenres.length > 0 ? selectedGenres : null,
-          mood: selectedMoods.length > 0 ? selectedMoods : null,
+          type_beat_tags: typeBeatTags.length > 0 ? typeBeatTags : null,
           audio_url: audioUrlData.publicUrl,
           cover_url: coverUrl,
           video_url: videoUrl,
@@ -138,13 +131,19 @@ export function UploadForm({ userId }: UploadFormProps) {
         .single()
       if (insertError) throw new Error(insertError.message)
 
-      // Fire-and-forget AI analysis — don't block upload success UX
+      // Fire-and-forget AI analysis + audio embedding — run in parallel, don't block UX
       if (newBeat?.id) {
+        const beatPayload = JSON.stringify({ beatId: newBeat.id })
         fetch('/api/beats/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ beatId: newBeat.id }),
-        }).catch(() => {/* analysis is best-effort */})
+          body: beatPayload,
+        }).catch(() => {})
+        fetch('/api/ai/generate-embedding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: beatPayload,
+        }).catch(() => {})
       }
 
       setProgress(100)
@@ -259,46 +258,17 @@ export function UploadForm({ userId }: UploadFormProps) {
         </div>
       </div>
 
-      {/* ── Genres ───────────────────────────────────────────────────────── */}
+      {/* ── Type Beat Tags ────────────────────────────────────────────────── */}
       <div className="space-y-2">
-        <Label>Genre <span className="text-muted-foreground text-xs font-normal">(up to 3)</span></Label>
-        <div className="flex flex-wrap gap-2">
-          {GENRES.map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => toggleGenre(g)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                selectedGenres.includes(g)
-                  ? 'border-primary bg-primary/15 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/40'
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Mood ─────────────────────────────────────────────────────────── */}
-      <div className="space-y-2">
-        <Label>Mood <span className="text-muted-foreground text-xs font-normal">(up to 3)</span></Label>
-        <div className="flex flex-wrap gap-2">
-          {MOODS.map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => toggleMood(m)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                selectedMoods.includes(m)
-                  ? 'border-primary bg-primary/15 text-primary'
-                  : 'border-border text-muted-foreground hover:border-primary/40'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
+        <Label>
+          Type Beat <span className="text-destructive">*</span>{' '}
+          <span className="text-muted-foreground text-xs font-normal">(up to 3 artists)</span>
+        </Label>
+        <TypeBeatSelector
+          selected={typeBeatTags}
+          onChange={(tags) => { setTypeBeatTags(tags); if (tags.length > 0) setTypeBeatError(null) }}
+          error={typeBeatError}
+        />
       </div>
 
       {/* ── Cover image ──────────────────────────────────────────────────── */}

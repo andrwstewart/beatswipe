@@ -2,17 +2,19 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Play, Heart, Download, X, Music2, Pause } from 'lucide-react'
+import { Heart, Download, Music2, Play, Pause } from 'lucide-react'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { WaveformPlayer } from '@/components/audio/WaveformPlayer'
 import { useAudio } from '@/hooks/useAudio'
+import { useInteraction } from '@/hooks/useInteraction'
 import type { Beat } from '@/types'
 
 interface BeatGridProps {
   beats: Beat[]
+  userId?: string
 }
 
-export function BeatGrid({ beats }: BeatGridProps) {
+export function BeatGrid({ beats, userId }: BeatGridProps) {
   const [selected, setSelected] = useState<Beat | null>(null)
 
   if (beats.length === 0) {
@@ -33,7 +35,11 @@ export function BeatGrid({ beats }: BeatGridProps) {
       </div>
 
       {selected && (
-        <BeatDetailModal beat={selected} onClose={() => setSelected(null)} />
+        <BeatDetailModal
+          beat={selected}
+          userId={userId}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   )
@@ -59,10 +65,8 @@ function BeatTile({ beat, onSelect }: { beat: Beat; onSelect: (b: Beat) => void 
         </div>
       )}
 
-      {/* Tap overlay */}
       <div className="absolute inset-0 bg-black/0 group-active:bg-black/30 transition-colors" />
 
-      {/* Stats bar */}
       <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 py-1">
         <div className="flex items-center gap-1.5 text-white/70 text-[10px]">
           <Heart className="w-2.5 h-2.5" />
@@ -73,10 +77,24 @@ function BeatTile({ beat, onSelect }: { beat: Beat; onSelect: (b: Beat) => void 
   )
 }
 
-function BeatDetailModal({ beat, onClose }: { beat: Beat; onClose: () => void }) {
+function BeatDetailModal({
+  beat,
+  userId,
+  onClose,
+}: {
+  beat: Beat
+  userId?: string
+  onClose: () => void
+}) {
   const { play, pause, isPlaying } = useAudio()
   const playing = isPlaying(beat.id)
   const producerName = beat.producer?.display_name ?? beat.producer?.username ?? 'Unknown'
+
+  const interaction = useInteraction({
+    beatId: beat.id,
+    userId: userId ?? '',
+    producerId: beat.producer_id,
+  })
 
   function handleClose() {
     pause()
@@ -90,7 +108,11 @@ function BeatDetailModal({ beat, onClose }: { beat: Beat; onClose: () => void })
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) handleClose() }}>
-      <DialogContent className="bg-card border-border p-0 max-w-sm mx-auto overflow-hidden rounded-2xl">
+      {/* showCloseButton={false} — we use our own X on the cover image */}
+      <DialogContent
+        showCloseButton={false}
+        className="bg-card border-border p-0 max-w-sm mx-auto overflow-hidden rounded-2xl"
+      >
         {/* Cover */}
         <div className="relative w-full aspect-square bg-zinc-900">
           {beat.cover_url ? (
@@ -102,15 +124,15 @@ function BeatDetailModal({ beat, onClose }: { beat: Beat; onClose: () => void })
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/60" />
 
-          {/* Close */}
+          {/* Single close button */}
           <button
             onClick={handleClose}
-            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
+            className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center text-white font-bold text-lg leading-none"
           >
-            <X className="w-4 h-4 text-white" />
+            ×
           </button>
 
-          {/* Play button overlay */}
+          {/* Play button */}
           <button
             onClick={togglePlay}
             className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg"
@@ -157,14 +179,31 @@ function BeatDetailModal({ beat, onClose }: { beat: Beat; onClose: () => void })
             />
           )}
 
-          {/* Stats */}
-          <div className="flex gap-4 pt-1 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Heart className="w-3.5 h-3.5" /> {beat.likes_count}
-            </span>
-            <span className="flex items-center gap-1">
-              <Download className="w-3.5 h-3.5" /> {beat.downloads_count}
-            </span>
+          {/* Stats + Download */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Heart className="w-3.5 h-3.5" /> {beat.likes_count}
+              </span>
+              <span className="flex items-center gap-1">
+                <Download className="w-3.5 h-3.5" /> {beat.downloads_count}
+              </span>
+            </div>
+
+            {userId && beat.audio_url && (
+              <button
+                onClick={() => interaction.download(beat.audio_url!, beat.title)}
+                disabled={interaction.downloaded || interaction.loading}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  interaction.downloaded
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-primary text-black'
+                }`}
+              >
+                <Download className="w-4 h-4" />
+                {interaction.downloaded ? 'Downloaded' : 'Download'}
+              </button>
+            )}
           </div>
         </div>
       </DialogContent>

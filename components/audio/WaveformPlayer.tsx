@@ -57,6 +57,10 @@ export function WaveformPlayer({
       })
 
       ws.on('finish', () => {
+        // Seek back to start so the next play() call (when user returns to this
+        // card) begins from the beginning rather than silently doing nothing at
+        // position 1.0.
+        ws.seekTo(0)
         onFinish?.()
       })
 
@@ -80,10 +84,13 @@ export function WaveformPlayer({
     }
   }, [audioUrl, beatId])
 
-  // Auto-play when this card becomes active
+  // Each WaveformPlayer drives its own wavesurfer directly.
+  // AudioProvider.play() only updates activeBeatId state (and pauses the old
+  // beat); it no longer calls the registered play() callback. This ensures only
+  // the visible card's wavesurfer plays — the registered callback slot can point
+  // to the wrong instance when the same beat appears at multiple loop positions.
   useEffect(() => {
     if (!wavesurferRef.current || !ready) return
-
     if (isActive) {
       wavesurferRef.current.play()
     } else {
@@ -101,12 +108,12 @@ export function WaveformPlayer({
       {!ready && (
         <div className="flex items-center justify-center h-[72px]">
           <div className="flex gap-1 items-end">
-            {Array.from({ length: 20 }).map((_, i) => (
+            {[30, 45, 20, 55, 35, 50, 25, 60, 40, 15, 50, 35, 55, 28, 48, 22, 56, 38, 44, 18].map((h, i) => (
               <div
                 key={i}
                 className="w-[2px] bg-white/20 rounded-full animate-pulse"
                 style={{
-                  height: `${Math.random() * 48 + 8}px`,
+                  height: `${h}px`,
                   animationDelay: `${i * 50}ms`,
                 }}
               />
