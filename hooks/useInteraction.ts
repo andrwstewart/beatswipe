@@ -125,15 +125,28 @@ export function useInteraction({
       if (loading || downloaded) return
       setLoading(true)
 
+      const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
       try {
-        const response = await fetch(audioUrl)
-        const blob = await response.blob()
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${title}.mp3`
-        a.click()
-        URL.revokeObjectURL(url)
+        if (isMobile) {
+          // iOS Safari blocks window.open / a.click() after an await because the
+          // call is no longer within the user gesture context. Open the URL
+          // synchronously first, then do the async database work.
+          window.open(audioUrl, '_blank')
+        } else {
+          // Desktop: fetch as blob so the browser shows a save-file dialog.
+          const response = await fetch(audioUrl)
+          const blob = await response.blob()
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.style.display = 'none'
+          a.href = url
+          a.download = `${title}.mp3`
+          document.body.appendChild(a)
+          a.click()
+          // Delay revoke so the browser has time to initiate the download.
+          setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 150)
+        }
 
         setDownloaded(true)
         await upsertInteraction('download')
@@ -141,6 +154,8 @@ export function useInteraction({
         if (producerId) sendDownloadMessage(userId, producerId).catch(() => {})
       } catch (err) {
         console.error('Download failed', err)
+        // Last-resort fallback for any unhandled error.
+        window.open(audioUrl, '_blank')
       } finally {
         setLoading(false)
       }
