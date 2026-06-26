@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Music2 } from 'lucide-react'
+import { BeatSwipeLogo } from '@/components/ui/BeatSwipeLogo'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -37,7 +37,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-2 text-center">
           <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20">
-            <Music2 className="w-7 h-7 text-primary" />
+            <BeatSwipeLogo size={28} className="text-primary" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">BeatSwipe</h1>
           <p className="text-sm text-muted-foreground">Discover beats. Connect with producers.</p>

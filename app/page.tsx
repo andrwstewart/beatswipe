@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Music2 } from 'lucide-react'
+import { BeatSwipeLogo } from '@/components/ui/BeatSwipeLogo'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -10,7 +10,7 @@ export default function LandingPage() {
         {/* Logo mark */}
         <div className="relative">
           <div className="w-20 h-20 rounded-3xl bg-primary/10 border border-primary/30 flex items-center justify-center neon-glow mx-auto">
-            <Music2 className="w-10 h-10 text-primary" />
+            <BeatSwipeLogo size={40} className="text-primary" />
           </div>
           <div className="absolute -inset-4 rounded-3xl bg-primary/5 blur-xl -z-10" />
         </div>
