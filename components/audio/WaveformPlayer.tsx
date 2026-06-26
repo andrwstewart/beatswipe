@@ -23,6 +23,12 @@ export function WaveformPlayer({
   const [ready, setReady] = useState(false)
   const registry = useContext(AudioRegistryContext)
 
+  // Tracks whether play() was blocked by the browser's autoplay policy.
+  // On mobile, the first play() before any user gesture is rejected silently.
+  const pendingPlayRef = useRef(false)
+  const isActiveRef = useRef(isActive)
+  useEffect(() => { isActiveRef.current = isActive }, [isActive])
+
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -92,11 +98,36 @@ export function WaveformPlayer({
   useEffect(() => {
     if (!wavesurferRef.current || !ready) return
     if (isActive) {
-      wavesurferRef.current.play()
+      const result = wavesurferRef.current.play() as unknown as Promise<void> | void
+      // Mobile browsers block autoplay until the first user gesture. If play()
+      // returns a rejected promise, mark it pending and retry on first touch.
+      if (result && typeof (result as Promise<void>).catch === 'function') {
+        ;(result as Promise<void>).catch(() => {
+          pendingPlayRef.current = true
+        })
+      }
     } else {
       wavesurferRef.current.pause()
+      pendingPlayRef.current = false
     }
   }, [isActive, ready])
+
+  // Retry play on the first user gesture (touchstart/mousedown) so the active
+  // card starts playing the moment the visitor first interacts with the page.
+  useEffect(() => {
+    const retryPlay = () => {
+      if (pendingPlayRef.current && wavesurferRef.current && isActiveRef.current) {
+        wavesurferRef.current.play()
+        pendingPlayRef.current = false
+      }
+    }
+    document.addEventListener('touchstart', retryPlay, { passive: true })
+    document.addEventListener('mousedown', retryPlay)
+    return () => {
+      document.removeEventListener('touchstart', retryPlay)
+      document.removeEventListener('mousedown', retryPlay)
+    }
+  }, [])
 
   return (
     <div className="w-full px-4">
