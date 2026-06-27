@@ -45,6 +45,11 @@ export default function LandingPage() {
           </Link>
         </div>
       </div>
+
+      <p className="absolute bottom-6 text-xs text-muted-foreground text-center w-full px-4">
+        By signing up you agree to our{' '}
+        <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+      </p>
     </div>
   )
 }

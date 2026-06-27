@@ -203,6 +203,11 @@ export default function SignupPage() {
             Sign in
           </Link>
         </p>
+
+        <p className="text-center text-xs text-muted-foreground">
+          By creating an account you agree to our{' '}
+          <Link href="/terms" className="text-primary hover:underline">Terms of Service</Link>
+        </p>
       </div>
     </div>
   )
