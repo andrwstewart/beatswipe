@@ -69,6 +69,7 @@ export interface Conversation {
   last_message_at: string | null
   other_user?: Profile
   last_message?: Message
+  has_unread?: boolean
 }
 
 export interface Message {
@@ -78,6 +79,7 @@ export interface Message {
   content: string | null
   audio_url: string | null
   file_url: string | null
+  read_at: string | null
   created_at: string
   sender?: Profile
 }

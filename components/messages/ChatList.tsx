@@ -1,9 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { formatDistanceToNow } from '@/lib/utils'
-import type { Conversation } from '@/types'
+import { createClient } from '@/lib/supabase/client'
+import type { Conversation, Message } from '@/types'
 
 interface ChatListProps {
   conversations: Conversation[]
@@ -11,6 +13,31 @@ interface ChatListProps {
 }
 
 export function ChatList({ conversations, currentUserId }: ChatListProps) {
+  // Track which conversation IDs have unread messages
+  const [unreadConvIds, setUnreadConvIds] = useState<Set<string>>(
+    () => new Set(conversations.filter((c) => c.has_unread).map((c) => c.id))
+  )
+
+  // Listen for realtime new messages (to add dots when a message arrives while on this page)
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('chatlist-new-messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const msg = payload.new as Message
+          if (msg.sender_id !== currentUserId) {
+            setUnreadConvIds((prev) => new Set([...prev, msg.conversation_id]))
+          }
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [currentUserId])
+
   if (conversations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3 text-center px-8">
@@ -29,6 +56,7 @@ export function ChatList({ conversations, currentUserId }: ChatListProps) {
         const other = conv.other_user
         const displayName = other?.display_name ?? other?.username ?? 'Unknown'
         const lastMsg = conv.last_message
+        const isUnread = unreadConvIds.has(conv.id)
 
         return (
           <Link
@@ -45,18 +73,25 @@ export function ChatList({ conversations, currentUserId }: ChatListProps) {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="font-semibold text-sm truncate">{displayName}</p>
+                <p className={`text-sm truncate ${isUnread ? 'font-bold text-foreground' : 'font-semibold'}`}>
+                  {displayName}
+                </p>
                 {conv.last_message_at && (
                   <span className="text-xs text-muted-foreground flex-shrink-0">
                     {formatDistanceToNow(new Date(conv.last_message_at))}
                   </span>
                 )}
               </div>
-              <p className="text-muted-foreground text-xs truncate mt-0.5">
+              <p className={`text-xs truncate mt-0.5 ${isUnread ? 'text-foreground/80' : 'text-muted-foreground'}`}>
                 {lastMsg?.sender_id === currentUserId ? 'You: ' : ''}
                 {lastMsg?.content ?? 'Sent a file'}
               </p>
             </div>
+
+            {/* Unread dot */}
+            {isUnread && (
+              <div className="w-2.5 h-2.5 rounded-full bg-white flex-shrink-0" />
+            )}
           </Link>
         )
       })}

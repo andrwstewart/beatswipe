@@ -34,7 +34,8 @@ export function ChatWindow({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Mark all unread messages in this conversation as read
+  // Mark all unread messages in this conversation as read, then fire a
+  // custom event so the badge count in BottomNav updates instantly.
   useEffect(() => {
     const supabase = createClient()
     supabase
@@ -43,7 +44,9 @@ export function ChatWindow({
       .eq('conversation_id', conversationId)
       .neq('sender_id', currentUserId)
       .is('read_at', null)
-      .then(() => {})
+      .then(() => {
+        window.dispatchEvent(new CustomEvent('messages-read', { detail: { conversationId } }))
+      })
   }, [conversationId, currentUserId])
 
   // Realtime subscription
@@ -71,7 +74,9 @@ export function ChatWindow({
               .from('messages')
               .update({ read_at: new Date().toISOString() })
               .eq('id', newMsg.id)
-              .then(() => {})
+              .then(() => {
+                window.dispatchEvent(new CustomEvent('messages-read', { detail: { conversationId } }))
+              })
           }
         }
       )

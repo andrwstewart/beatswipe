@@ -16,7 +16,7 @@ export default async function MessagesPage() {
     .from('conversations')
     .select(`
       *,
-      messages (id, sender_id, content, audio_url, file_url, created_at)
+      messages (id, sender_id, content, audio_url, file_url, read_at, created_at)
     `)
     .or(`participant_a.eq.${user.id},participant_b.eq.${user.id}`)
     .order('last_message_at', { ascending: false })
@@ -32,9 +32,11 @@ export default async function MessagesPage() {
         .single()
 
       const msgs: Message[] = conv.messages ?? []
-      const lastMessage = msgs.sort(
+      const sorted = msgs.sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )[0]
+      )
+      const lastMessage = sorted[0]
+      const hasUnread = msgs.some((m) => m.sender_id !== user.id && !m.read_at)
 
       return {
         id: conv.id,
@@ -43,6 +45,7 @@ export default async function MessagesPage() {
         last_message_at: conv.last_message_at,
         other_user: otherUser as Profile,
         last_message: lastMessage,
+        has_unread: hasUnread,
       }
     })
   )

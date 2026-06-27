@@ -48,5 +48,12 @@ export function useUnreadCount(userId: string | undefined): number {
     return () => { supabase.removeChannel(channel) }
   }, [userId, fetchCount])
 
+  // Instant update: ChatWindow dispatches this event the moment it marks messages read,
+  // so the badge count drops immediately without waiting for the realtime UPDATE echo.
+  useEffect(() => {
+    window.addEventListener('messages-read', fetchCount)
+    return () => { window.removeEventListener('messages-read', fetchCount) }
+  }, [fetchCount])
+
   return count
 }
