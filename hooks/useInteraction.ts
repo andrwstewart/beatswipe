@@ -151,7 +151,7 @@ export function useInteraction({
         setDownloaded(true)
         await upsertInteraction('download')
         onCollabPrompt?.()
-        if (producerId) sendDownloadMessage(userId, producerId).catch(() => {})
+        if (producerId) sendDownloadMessage(userId, producerId, title).catch(() => {})
       } catch (err) {
         console.error('Download failed', err)
         // Last-resort fallback for any unhandled error.

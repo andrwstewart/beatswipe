@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 
-export async function sendDownloadMessage(downloaderId: string, producerId: string): Promise<void> {
+export async function sendDownloadMessage(downloaderId: string, producerId: string, beatTitle: string): Promise<void> {
   if (downloaderId === producerId) return
 
   const supabase = createClient()
@@ -37,6 +37,6 @@ export async function sendDownloadMessage(downloaderId: string, producerId: stri
   await supabase.from('messages').insert({
     conversation_id: conversationId,
     sender_id: downloaderId,
-    content: 'Hey just wanted to let you know I downloaded your beat',
+    content: `Hey just wanted to let you know I downloaded your beat "${beatTitle}"`,
   })
 }
