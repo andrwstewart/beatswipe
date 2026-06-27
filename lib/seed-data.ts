@@ -13,6 +13,8 @@ export const DEMO_PRODUCERS: Profile[] = [
     placements: ['Lil Baby', 'Future', '21 Savage'],
     instagram_url: null,
     discord_url: null,
+    tiktok_url: null,
+    soundcloud_url: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -27,6 +29,8 @@ export const DEMO_PRODUCERS: Profile[] = [
     placements: ['Central Cee'],
     instagram_url: null,
     discord_url: null,
+    tiktok_url: null,
+    soundcloud_url: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -41,6 +45,8 @@ export const DEMO_PRODUCERS: Profile[] = [
     placements: [],
     instagram_url: null,
     discord_url: null,
+    tiktok_url: null,
+    soundcloud_url: null,
     created_at: new Date().toISOString(),
   },
 ]

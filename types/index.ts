@@ -16,6 +16,8 @@ export interface Profile {
   placements: string[] | null
   instagram_url: string | null
   discord_url: string | null
+  tiktok_url: string | null
+  soundcloud_url: string | null
   created_at: string
 }
 
