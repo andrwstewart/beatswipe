@@ -14,6 +14,8 @@ export interface Profile {
   location: string | null
   role: UserRole
   placements: string[] | null
+  instagram_url: string | null
+  discord_url: string | null
   created_at: string
 }
 

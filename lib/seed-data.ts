@@ -11,6 +11,8 @@ export const DEMO_PRODUCERS: Profile[] = [
     location: 'Atlanta, GA',
     role: 'producer',
     placements: ['Lil Baby', 'Future', '21 Savage'],
+    instagram_url: null,
+    discord_url: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -23,6 +25,8 @@ export const DEMO_PRODUCERS: Profile[] = [
     location: 'London, UK',
     role: 'producer',
     placements: ['Central Cee'],
+    instagram_url: null,
+    discord_url: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -35,6 +39,8 @@ export const DEMO_PRODUCERS: Profile[] = [
     location: 'Los Angeles, CA',
     role: 'producer',
     placements: [],
+    instagram_url: null,
+    discord_url: null,
     created_at: new Date().toISOString(),
   },
 ]
