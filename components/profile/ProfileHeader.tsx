@@ -44,6 +44,8 @@ export function ProfileHeader({
 
   // Edit form state
   const [displayName, setDisplayName] = useState(profile.display_name ?? '')
+  const [username, setUsername] = useState(profile.username)
+  const [usernameError, setUsernameError] = useState<string | null>(null)
   const [bio, setBio] = useState(profile.bio ?? '')
   const [instagram, setInstagram] = useState(profile.instagram_url ?? '')
   const [discord, setDiscord] = useState(profile.discord_url ?? '')
@@ -52,6 +54,12 @@ export function ProfileHeader({
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  function handleUsernameChange(val: string) {
+    const clean = val.toLowerCase().replace(/[^a-z0-9_]/g, '')
+    setUsername(clean)
+    setUsernameError(null)
+  }
 
   async function toggleFollow() {
     if (!currentUserId || loading) return
@@ -83,8 +91,29 @@ export function ProfileHeader({
 
   async function saveProfile() {
     if (!currentUserId || saving) return
+
+    const trimmedUsername = username.trim()
+    if (trimmedUsername.length < 3) {
+      setUsernameError('Username must be at least 3 characters')
+      return
+    }
+
     setSaving(true)
     const supabase = createClient()
+
+    // Check username availability if it changed
+    if (trimmedUsername !== profile.username) {
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', trimmedUsername)
+        .single()
+      if (existing) {
+        setUsernameError('Username is already taken')
+        setSaving(false)
+        return
+      }
+    }
 
     let avatarUrl = profile.avatar_url
 
@@ -119,6 +148,7 @@ export function ProfileHeader({
     await supabase
       .from('profiles')
       .update({
+        username: trimmedUsername,
         display_name: displayName || null,
         bio: bio || null,
         avatar_url: avatarUrl,
@@ -131,7 +161,12 @@ export function ProfileHeader({
 
     setSaving(false)
     setEditOpen(false)
-    router.refresh()
+    // If username changed, navigate to new profile URL
+    if (trimmedUsername !== profile.username) {
+      router.push(`/profile/${trimmedUsername}`)
+    } else {
+      router.refresh()
+    }
   }
 
   const displayNameVal = profile.display_name ?? profile.username
@@ -303,6 +338,25 @@ export function ProfileHeader({
           </div>
 
           <div className="space-y-4">
+            <div className="space-y-1">
+              <Label htmlFor="edit-username">Username</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                <Input
+                  id="edit-username"
+                  value={username}
+                  onChange={(e) => handleUsernameChange(e.target.value)}
+                  placeholder="yourname"
+                  className="bg-secondary/50 pl-7"
+                  minLength={3}
+                  maxLength={30}
+                />
+              </div>
+              {usernameError && (
+                <p className="text-xs text-destructive">{usernameError}</p>
+              )}
+            </div>
+
             <div className="space-y-1">
               <Label htmlFor="edit-name">Display name</Label>
               <Input
