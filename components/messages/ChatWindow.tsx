@@ -34,6 +34,18 @@ export function ChatWindow({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Mark all unread messages in this conversation as read
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .neq('sender_id', currentUserId)
+      .is('read_at', null)
+      .then(() => {})
+  }, [conversationId, currentUserId])
+
   // Realtime subscription
   useEffect(() => {
     const supabase = createClient()
@@ -53,6 +65,14 @@ export function ChatWindow({
             if (prev.find((m) => m.id === newMsg.id)) return prev
             return [...prev, newMsg]
           })
+          // If the incoming message is from the other user, mark it read immediately
+          if (newMsg.sender_id !== currentUserId) {
+            supabase
+              .from('messages')
+              .update({ read_at: new Date().toISOString() })
+              .eq('id', newMsg.id)
+              .then(() => {})
+          }
         }
       )
       .subscribe()
@@ -60,7 +80,7 @@ export function ChatWindow({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [conversationId])
+  }, [conversationId, currentUserId])
 
   async function sendMessage() {
     if (!text.trim() || sending) return

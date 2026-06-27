@@ -3,11 +3,15 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Search, MessageCircle, User, Plus } from 'lucide-react'
+import { useUnreadCount } from '@/hooks/useUnreadCount'
 
-export function BottomNav({ username }: { username?: string }) {
+export function BottomNav({ username, userId }: { username?: string; userId?: string }) {
   const pathname = usePathname()
+  const unreadCount = useUnreadCount(userId)
 
   const isActive = (path: string) => pathname.startsWith(path)
+
+  const formattedCount = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 bg-black/90 backdrop-blur-xl border-t border-white/10 pb-safe">
@@ -27,7 +31,21 @@ export function BottomNav({ username }: { username?: string }) {
         </Link>
 
         {/* Messages */}
-        <NavItem href="/messages" active={isActive('/messages')} icon={<MessageCircle className="w-6 h-6" />} label="Inbox" />
+        <NavItem
+          href="/messages"
+          active={isActive('/messages')}
+          icon={
+            <div className="relative">
+              <MessageCircle className="w-6 h-6" />
+              {formattedCount && (
+                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  {formattedCount}
+                </span>
+              )}
+            </div>
+          }
+          label="Inbox"
+        />
 
         {/* Profile */}
         <NavItem

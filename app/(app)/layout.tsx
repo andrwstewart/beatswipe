@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="relative min-h-dvh">
       {children}
-      <BottomNav username={profile?.username} />
+      <BottomNav username={profile?.username} userId={user.id} />
     </div>
   )
 }
