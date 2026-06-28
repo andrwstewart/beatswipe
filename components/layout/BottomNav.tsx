@@ -14,7 +14,6 @@ export function BottomNav({ username, userId }: { username?: string; userId?: st
   const isActive = (path: string) => pathname.startsWith(path)
   const formattedCount = unreadCount > 99 ? '99+' : unreadCount > 0 ? String(unreadCount) : null
 
-  // Prefetch all routes so tapping is instant
   useEffect(() => {
     router.prefetch('/feed')
     router.prefetch('/discover')
@@ -24,7 +23,7 @@ export function BottomNav({ username, userId }: { username?: string; userId?: st
   }, [username, router])
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 bg-black/90 backdrop-blur-xl border-t border-white/10 pb-safe">
+    <nav className="fixed bottom-0 inset-x-0 z-50 bg-black/80 backdrop-blur-2xl border-t border-white/8 pb-safe">
       <div className="flex items-center justify-around px-2 h-14 max-w-lg mx-auto">
 
         <NavItem href="/feed" active={isActive('/feed')} icon={<Home className="w-6 h-6" />} label="Home" />
@@ -36,7 +35,10 @@ export function BottomNav({ username, userId }: { username?: string; userId?: st
           className="relative flex items-center justify-center -mt-1 select-none active:scale-90 transition-transform duration-75"
           style={{ touchAction: 'manipulation' }}
         >
-          <div className="w-11 h-11 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center">
+          <div
+            className="w-11 h-11 rounded-2xl bg-primary/20 border border-primary/40 flex items-center justify-center"
+            style={{ boxShadow: '0 0 16px rgba(0,255,136,0.25)' }}
+          >
             <Plus className="w-5 h-5 text-primary" />
           </div>
         </Link>
@@ -84,12 +86,30 @@ function NavItem({
   return (
     <Link
       href={href}
-      className="flex flex-col items-center gap-0.5 px-3 py-1 min-w-[52px] text-white/60 transition-all duration-75 select-none active:scale-90 active:opacity-50"
+      className={`flex flex-col items-center gap-0.5 px-3 py-1 min-w-[52px] transition-all duration-150 select-none active:scale-90 active:opacity-50 ${
+        active ? 'text-primary' : 'text-white/45'
+      }`}
       style={{ touchAction: 'manipulation' }}
     >
-      {icon}
-      <span className="text-[10px] font-medium">{label}</span>
-      {active && <span className="w-1 h-1 rounded-full bg-white/60 mt-0.5" />}
+      <div
+        style={
+          active
+            ? { filter: 'drop-shadow(0 0 8px #00ff88) drop-shadow(0 0 2px #00ff88)' }
+            : undefined
+        }
+        className="transition-all duration-200"
+      >
+        {icon}
+      </div>
+      <span className={`text-[10px] font-semibold tracking-wide ${active ? 'text-primary' : 'text-white/45'}`}>
+        {label}
+      </span>
+      {active && (
+        <span
+          className="w-4 h-0.5 rounded-full bg-primary mt-0.5"
+          style={{ boxShadow: '0 0 8px #00ff88, 0 0 3px #00ff88' }}
+        />
+      )}
     </Link>
   )
 }
