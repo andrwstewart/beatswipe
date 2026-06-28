@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Music2, Layers } from 'lucide-react'
+import { Music2, Layers, Users } from 'lucide-react'
 import { UploadForm } from './UploadForm'
 import { BulkUploadForm } from './BulkUploadForm'
+import { CommunityPostForm } from '@/components/community/CommunityPostForm'
 
-type Mode = 'single' | 'bulk'
+type Mode = 'single' | 'bulk' | 'community'
 
 export function UploadModeSwitcher({ userId }: { userId: string }) {
   const [mode, setMode] = useState<Mode>('single')
@@ -27,10 +28,17 @@ export function UploadModeSwitcher({ userId }: { userId: string }) {
           label="Bulk Upload"
           badge="up to 10"
         />
+        <ModeTab
+          active={mode === 'community'}
+          onClick={() => setMode('community')}
+          icon={<Users className="w-4 h-4" />}
+          label="Community"
+        />
       </div>
 
       {mode === 'single' && <UploadForm userId={userId} />}
       {mode === 'bulk' && <BulkUploadForm userId={userId} />}
+      {mode === 'community' && <CommunityPostForm userId={userId} />}
     </div>
   )
 }
