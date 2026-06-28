@@ -87,27 +87,27 @@ function NavItem({
     <Link
       href={href}
       className={`flex flex-col items-center gap-0.5 px-3 py-1 min-w-[52px] transition-all duration-150 select-none active:scale-90 active:opacity-50 ${
-        active ? 'text-primary' : 'text-white/45'
+        active ? 'text-white' : 'text-white/45'
       }`}
       style={{ touchAction: 'manipulation' }}
     >
       <div
         style={
           active
-            ? { filter: 'drop-shadow(0 0 8px #00ff88) drop-shadow(0 0 2px #00ff88)' }
+            ? { filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.9)) drop-shadow(0 0 3px rgba(255,255,255,0.6))' }
             : undefined
         }
         className="transition-all duration-200"
       >
         {icon}
       </div>
-      <span className={`text-[10px] font-semibold tracking-wide ${active ? 'text-primary' : 'text-white/45'}`}>
+      <span className={`text-[10px] font-semibold tracking-wide ${active ? 'text-white' : 'text-white/45'}`}>
         {label}
       </span>
       {active && (
         <span
-          className="w-4 h-0.5 rounded-full bg-primary mt-0.5"
-          style={{ boxShadow: '0 0 8px #00ff88, 0 0 3px #00ff88' }}
+          className="w-4 h-0.5 rounded-full bg-white mt-0.5"
+          style={{ boxShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 3px white' }}
         />
       )}
     </Link>
