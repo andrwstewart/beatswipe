@@ -1,16 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, Download, ArrowLeft, Music2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import type { Beat } from '@/types'
 
-export default function PaymentSuccessPage() {
+function PaymentSuccessContent() {
   const searchParams = useSearchParams()
-  const router = useRouter()
   const beatId = searchParams.get('beat_id')
   const [beat, setBeat] = useState<Beat | null>(null)
   const [downloading, setDownloading] = useState(false)
@@ -40,7 +39,6 @@ export default function PaymentSuccessPage() {
       a.click()
       setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 150)
     } catch {
-      // Fallback
       window.open(beat.audio_url, '_blank')
     } finally {
       setDownloading(false)
@@ -51,14 +49,12 @@ export default function PaymentSuccessPage() {
     <div className="min-h-dvh bg-background flex flex-col items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm space-y-8 text-center">
 
-        {/* Success icon */}
         <div className="flex justify-center">
           <div className="w-20 h-20 rounded-full bg-primary/15 flex items-center justify-center">
             <CheckCircle className="w-10 h-10 text-primary" />
           </div>
         </div>
 
-        {/* Message */}
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Payment successful</h1>
           <p className="text-muted-foreground">
@@ -74,14 +70,12 @@ export default function PaymentSuccessPage() {
           )}
         </div>
 
-        {/* Beat icon */}
         <div className="flex justify-center">
           <div className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center">
             <Music2 className="w-8 h-8 text-muted-foreground" />
           </div>
         </div>
 
-        {/* Download button */}
         <div className="space-y-3">
           <Button
             className="w-full gap-2"
@@ -103,5 +97,13 @@ export default function PaymentSuccessPage() {
 
       </div>
     </div>
+  )
+}
+
+export default function PaymentSuccessPage() {
+  return (
+    <Suspense>
+      <PaymentSuccessContent />
+    </Suspense>
   )
 }
