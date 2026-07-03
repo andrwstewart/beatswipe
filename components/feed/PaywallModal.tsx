@@ -21,7 +21,6 @@ export function PaywallModal({ beat, userId, onClose, onFreeDownload }: PaywallM
   const [errorMsg, setErrorMsg] = useState('')
 
   const priceDollars = ((beat.price_cents ?? 0) / 100).toFixed(2)
-  const producerShare = (((beat.price_cents ?? 0) * 0.75) / 100).toFixed(2)
 
   useEffect(() => {
     async function checkPurchase() {
@@ -120,20 +119,9 @@ export function PaywallModal({ beat, userId, onClose, onFreeDownload }: PaywallM
 
           {(state === 'purchase' || state === 'paying') && (
             <>
-              {/* Price breakdown */}
-              <div className="bg-secondary/40 rounded-2xl p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Beat price</span>
-                  <span className="font-semibold">${priceDollars}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Goes to {producerName}</span>
-                  <span className="text-primary font-semibold">${producerShare}</span>
-                </div>
-                <div className="border-t border-border pt-2 flex justify-between text-xs text-muted-foreground">
-                  <span>BeatSwipe platform fee</span>
-                  <span>25%</span>
-                </div>
+              <div className="bg-secondary/40 rounded-2xl p-4 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Price</span>
+                <span className="text-lg font-bold">${priceDollars}</span>
               </div>
 
               <p className="text-xs text-muted-foreground text-center">

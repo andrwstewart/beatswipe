@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { createClient } from '@/lib/supabase/client'
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Upload, Music2, Image as ImageIcon, Video, X, Check } from 'lucide-react'
+import { Upload, Music2, Image as ImageIcon, Video, X, Check, ExternalLink } from 'lucide-react'
 import { KEYS } from '@/types'
 import { TypeBeatSelector } from '@/components/upload/TypeBeatSelector'
 
@@ -31,6 +31,7 @@ export function UploadForm({ userId }: UploadFormProps) {
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
   const [price, setPrice] = useState('')
+  const [stripeConnected, setStripeConnected] = useState(false)
   const [typeBeatTags, setTypeBeatTags] = useState<string[]>([])
   const [typeBeatError, setTypeBeatError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -40,6 +41,24 @@ export function UploadForm({ userId }: UploadFormProps) {
   const [error, setError] = useState<string | null>(null)
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>()
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('profiles')
+      .select('stripe_payouts_enabled')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => {
+        if (data?.stripe_payouts_enabled) setStripeConnected(true)
+      })
+  }, [userId])
+
+  async function connectStripe() {
+    const res = await fetch('/api/stripe/connect/onboard', { method: 'POST' })
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+  }
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -238,28 +257,44 @@ export function UploadForm({ userId }: UploadFormProps) {
       {/* ── Price ────────────────────────────────────────────────────────── */}
       <div className="space-y-2">
         <Label>Download price</Label>
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
-          <Input
-            type="number"
-            placeholder="0.00 — leave blank for free"
-            min={0}
-            step={0.01}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="bg-secondary/50 pl-6"
-          />
-        </div>
-        {price && parseFloat(price) > 0 && parseFloat(price) < 0.99 && (
-          <p className="text-xs text-destructive">Minimum paid price is $0.99</p>
-        )}
-        {price && parseFloat(price) >= 0.99 && (
-          <p className="text-xs text-muted-foreground">
-            You receive ${(parseFloat(price) * 0.75).toFixed(2)} · BeatSwipe keeps 25%
-          </p>
-        )}
-        {(!price || parseFloat(price) === 0) && (
-          <p className="text-xs text-muted-foreground">Free download for all artists</p>
+        {!stripeConnected ? (
+          <div className="flex items-center justify-between px-3 py-3 rounded-xl border border-border bg-secondary/40">
+            <div>
+              <p className="text-sm font-medium">Connect Stripe to charge for beats</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Set up payouts to unlock paid downloads</p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="ml-3 flex-shrink-0 gap-1.5 border-border text-xs"
+              onClick={connectStripe}
+            >
+              <ExternalLink className="w-3 h-3" />
+              Connect
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+              <Input
+                type="number"
+                placeholder="0.00 — leave blank for free"
+                min={0}
+                step={0.01}
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="bg-secondary/50 pl-6"
+              />
+            </div>
+            {price && parseFloat(price) > 0 && parseFloat(price) < 0.99 && (
+              <p className="text-xs text-destructive">Minimum paid price is $0.99</p>
+            )}
+            {(!price || parseFloat(price) === 0) && (
+              <p className="text-xs text-muted-foreground">Free download for all artists</p>
+            )}
+          </>
         )}
       </div>
 
