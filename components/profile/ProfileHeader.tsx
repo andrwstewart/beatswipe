@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { MessageCircle, MapPin, Music2, Camera } from 'lucide-react'
+import { MessageCircle, MapPin, Music2, Camera, BadgeCheck, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -38,9 +38,21 @@ export function ProfileHeader({
   totalDownloads,
 }: ProfileHeaderProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [following, setFollowing] = useState(initialFollowing)
   const [loading, setLoading] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [stripeConnecting, setStripeConnecting] = useState(false)
+  const [stripePayoutsEnabled, setStripePayoutsEnabled] = useState(profile.stripe_payouts_enabled)
+
+  // After returning from Stripe onboarding, check if the account is now active
+  useEffect(() => {
+    if (!isOwnProfile || !searchParams.get('stripe_connected')) return
+    fetch('/api/stripe/connect/status', { method: 'POST' })
+      .then((r) => r.json())
+      .then((d) => { if (d.payoutsEnabled) setStripePayoutsEnabled(true) })
+      .catch(() => {})
+  }, [isOwnProfile, searchParams])
 
   // Edit form state
   const [displayName, setDisplayName] = useState(profile.display_name ?? '')
@@ -87,6 +99,17 @@ export function ProfileHeader({
     if (!file) return
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
+  }
+
+  async function connectStripe() {
+    setStripeConnecting(true)
+    try {
+      const res = await fetch('/api/stripe/connect/onboard', { method: 'POST' })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+    } catch {
+      setStripeConnecting(false)
+    }
   }
 
   async function saveProfile() {
@@ -289,6 +312,43 @@ export function ProfileHeader({
             </div>
           )}
 
+          {/* Stripe Connect — shown to producers on their own profile */}
+          {isOwnProfile && profile.role !== 'artist' && (
+            <div className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm ${
+              stripePayoutsEnabled
+                ? 'border-emerald-500/30 bg-emerald-500/10'
+                : 'border-border bg-secondary/40'
+            }`}>
+              <div className="flex items-center gap-2">
+                {stripePayoutsEnabled ? (
+                  <>
+                    <BadgeCheck className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span className="text-emerald-400 font-medium text-xs">Stripe payouts active</span>
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-xs">Connect Stripe to get paid</p>
+                      <p className="text-muted-foreground text-[11px]">Receive 75% of every beat sale automatically</p>
+                    </div>
+                  </>
+                )}
+              </div>
+              {!stripePayoutsEnabled && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="ml-3 h-7 text-xs border-border flex-shrink-0"
+                  onClick={connectStripe}
+                  disabled={stripeConnecting}
+                >
+                  {stripeConnecting ? 'Redirecting…' : 'Connect'}
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* Stats row */}
           <div className="flex gap-6 pt-1">
             <div className="text-center">
@@ -317,7 +377,8 @@ export function ProfileHeader({
 
       {/* Edit profile dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="bg-card border-border max-w-sm mx-auto rounded-2xl p-6">
+        <DialogContent className="bg-card border-border max-w-sm mx-auto rounded-2xl p-0 overflow-hidden max-h-[90dvh]">
+          <div className="overflow-y-auto overscroll-contain p-6 max-h-[90dvh]">
           <h2 className="text-base font-bold mb-4">Edit profile</h2>
 
           {/* Avatar upload */}
@@ -436,6 +497,7 @@ export function ProfileHeader({
             <Button className="w-full" onClick={saveProfile} disabled={saving}>
               {saving ? 'Saving…' : 'Save changes'}
             </Button>
+          </div>
           </div>
         </DialogContent>
       </Dialog>

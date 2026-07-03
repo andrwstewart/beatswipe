@@ -25,6 +25,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [role, setRole] = useState<'artist' | 'producer' | 'both'>('artist')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -52,6 +53,21 @@ export default function SignupPage() {
       setError('Username must be at least 3 characters')
       setLoading(false)
       return
+    }
+
+    // Normalize phone to E.164 format (optional — skip if blank)
+    let normalizedPhone: string | null = null
+    if (phone.trim()) {
+      const digits = phone.replace(/\D/g, '')
+      if (digits.length === 10) {
+        normalizedPhone = `+1${digits}`
+      } else if (digits.length === 11 && digits.startsWith('1')) {
+        normalizedPhone = `+${digits}`
+      } else {
+        setError('Enter a valid US phone number (10 digits)')
+        setLoading(false)
+        return
+      }
     }
 
     const supabase = createClient()
@@ -83,10 +99,12 @@ export default function SignupPage() {
       return
     }
 
-    // Update the role in the profile (trigger creates it with username)
+    // Update role + phone in the profile (trigger creates it with username)
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      await supabase.from('profiles').update({ role }).eq('id', user.id)
+      const update: Record<string, unknown> = { role }
+      if (normalizedPhone) update.phone = normalizedPhone
+      await supabase.from('profiles').update(update).eq('id', user.id)
     }
 
     router.push('/feed')
@@ -170,6 +188,19 @@ export default function SignupPage() {
               autoComplete="email"
               className="bg-secondary/50"
             />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="phone">Phone Number</Label>
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="(555) 123-4567"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              autoComplete="tel"
+              className="bg-secondary/50"
+            />
+            <p className="text-xs text-muted-foreground">Optional — we&apos;ll text you when artists download your beats.</p>
           </div>
           <div className="space-y-1">
             <Label htmlFor="password">Password</Label>

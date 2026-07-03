@@ -62,7 +62,7 @@ export function ChatList({ conversations, currentUserId }: ChatListProps) {
           <Link
             key={conv.id}
             href={`/messages/${conv.id}`}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors"
+            className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/4 transition-colors active:bg-white/6"
           >
             <Avatar className="w-12 h-12 flex-shrink-0">
               <AvatarImage src={other?.avatar_url ?? undefined} />

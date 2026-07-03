@@ -59,10 +59,10 @@ function ModeTab({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border text-sm font-semibold transition-all ${
         active
-          ? 'border-primary bg-primary/10 text-primary'
-          : 'border-border text-muted-foreground bg-secondary/30 hover:border-primary/30'
+          ? 'border-primary/60 bg-primary/10 text-primary'
+          : 'border-border/60 text-muted-foreground bg-secondary/20 hover:border-primary/25 hover:text-foreground/70'
       }`}
     >
       {icon}

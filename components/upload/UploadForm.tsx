@@ -30,6 +30,7 @@ export function UploadForm({ userId }: UploadFormProps) {
   const [videoFile, setVideoFile] = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(null)
   const [videoPreview, setVideoPreview] = useState<string | null>(null)
+  const [price, setPrice] = useState('')
   const [typeBeatTags, setTypeBeatTags] = useState<string[]>([])
   const [typeBeatError, setTypeBeatError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -114,6 +115,10 @@ export function UploadForm({ userId }: UploadFormProps) {
       // ── 4. Insert beat record ─────────────────────────────────────────────
       setProgressLabel('Saving beat…')
       const bpmNum = data.bpm ? parseInt(data.bpm, 10) : null
+      // Convert price to cents; 0 = free
+      const priceCents = price && parseFloat(price) >= 0.99
+        ? Math.round(parseFloat(price) * 100)
+        : 0
       const { data: newBeat, error: insertError } = await supabase
         .from('beats')
         .insert({
@@ -126,6 +131,7 @@ export function UploadForm({ userId }: UploadFormProps) {
           audio_url: audioUrlData.publicUrl,
           cover_url: coverUrl,
           video_url: videoUrl,
+          price_cents: priceCents,
         })
         .select('id')
         .single()
@@ -227,6 +233,34 @@ export function UploadForm({ userId }: UploadFormProps) {
           maxLength={500}
           {...register('description')}
         />
+      </div>
+
+      {/* ── Price ────────────────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <Label>Download price</Label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+          <Input
+            type="number"
+            placeholder="0.00 — leave blank for free"
+            min={0}
+            step={0.01}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="bg-secondary/50 pl-6"
+          />
+        </div>
+        {price && parseFloat(price) > 0 && parseFloat(price) < 0.99 && (
+          <p className="text-xs text-destructive">Minimum paid price is $0.99</p>
+        )}
+        {price && parseFloat(price) >= 0.99 && (
+          <p className="text-xs text-muted-foreground">
+            You receive ${(parseFloat(price) * 0.75).toFixed(2)} · BeatSwipe keeps 25%
+          </p>
+        )}
+        {(!price || parseFloat(price) === 0) && (
+          <p className="text-xs text-muted-foreground">Free download for all artists</p>
+        )}
       </div>
 
       {/* ── BPM + Key ────────────────────────────────────────────────────── */}

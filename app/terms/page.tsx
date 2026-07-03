@@ -81,8 +81,17 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="text-base font-bold text-foreground mb-2">8. Downloads and Beat Licenses</h2>
-          <p>Downloading a beat through BeatSwipe grants you a personal, non-exclusive, non-transferable license to listen to and use the beat for personal, non-commercial purposes only, unless the producer has explicitly granted additional rights. Downloading a beat does not transfer ownership or grant you the right to re-sell, redistribute, release commercially, or claim authorship of the beat. Any commercial use requires a separate written license agreement directly with the producer.</p>
+          <h2 className="text-base font-bold text-foreground mb-2">8. Free Downloads — Producer Acknowledgment</h2>
+          <p className="mb-3">BeatSwipe operates as a free beat discovery platform. By uploading a beat to BeatSwipe, producers explicitly acknowledge and agree to the following:</p>
+          <ul className="list-disc pl-5 space-y-1.5 mb-3">
+            <li><strong>Beats are available for free download.</strong> Any registered user on BeatSwipe may download your uploaded beats at no cost. This is a core and intended feature of the platform.</li>
+            <li><strong>You are choosing to make your beat available for free.</strong> Uploading a beat constitutes your voluntary decision to distribute it freely through BeatSwipe. If you do not wish your beat to be downloaded for free, do not upload it to the Service.</li>
+            <li><strong>BeatSwipe is not liable for free downloads of your content.</strong> By uploading, you waive any claim against BeatSwipe arising from users downloading your beat at no charge.</li>
+            <li><strong>Ownership is not transferred.</strong> A free download grants the downloader a personal, non-exclusive license for non-commercial use only. You retain full copyright and ownership of your beat at all times.</li>
+            <li><strong>Commercial use still requires your permission.</strong> A free download does not grant the downloader the right to release, sell, or commercially exploit your beat. Any commercial licensing remains a private agreement solely between you and the artist, independent of BeatSwipe.</li>
+            <li><strong>BeatSwipe does not collect revenue on your behalf</strong> from downloads, streams, or any use of your content on the platform. The platform does not act as your publisher, label, or licensing agent.</li>
+          </ul>
+          <p>If you do not agree with these terms regarding free downloads, you must not upload your beats to BeatSwipe.</p>
         </section>
 
         <section>

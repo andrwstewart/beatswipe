@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ChatList } from '@/components/messages/ChatList'
 import { CommunityCarousel } from '@/components/community/CommunityCarousel'
-import { MessageCircle } from 'lucide-react'
 import type { Conversation, Profile, Message } from '@/types'
 
 export default async function MessagesPage() {
@@ -61,10 +60,7 @@ export default async function MessagesPage() {
   return (
     <div className="min-h-dvh" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
       <div className="px-4 pb-4 border-b border-border" style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
-        <div className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5 text-primary" />
-          <h1 className="text-lg font-bold">Messages</h1>
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Messages</h1>
       </div>
       <CommunityCarousel
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

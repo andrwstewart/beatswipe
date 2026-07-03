@@ -151,7 +151,15 @@ export function useInteraction({
         setDownloaded(true)
         await upsertInteraction('download')
         onCollabPrompt?.()
-        if (producerId) sendDownloadMessage(userId, producerId, title).catch(() => {})
+        if (producerId) {
+          sendDownloadMessage(userId, producerId, title).catch(() => {})
+          // Fire-and-forget SMS to the producer
+          fetch('/api/sms/download-notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ producerId, beatTitle: title }),
+          }).catch(() => {})
+        }
       } catch (err) {
         console.error('Download failed', err)
         // Last-resort fallback for any unhandled error.

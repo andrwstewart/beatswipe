@@ -120,17 +120,18 @@ export default function DiscoverPage() {
       )}
 
       <div className="min-h-dvh pb-24" style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
-        {/* Search bar */}
+        {/* Header + Search bar */}
         <div className="px-4 pb-3 border-b border-border">
+          <h1 className="text-2xl font-bold tracking-tight mb-3">Discover</h1>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="search"
               value={query}
               onChange={handleChange}
               placeholder="Search beats, genres, producers…"
               autoFocus
-              className="w-full bg-secondary/60 rounded-xl pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/50"
+              className="w-full bg-secondary/50 rounded-2xl pl-10 pr-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-primary/40 transition-all"
             />
           </div>
         </div>

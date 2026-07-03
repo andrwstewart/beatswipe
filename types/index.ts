@@ -18,6 +18,9 @@ export interface Profile {
   discord_url: string | null
   tiktok_url: string | null
   soundcloud_url: string | null
+  phone: string | null
+  stripe_account_id: string | null
+  stripe_payouts_enabled: boolean
   created_at: string
 }
 
@@ -35,6 +38,7 @@ export interface Beat {
   cover_url: string | null
   video_url: string | null
   duration_seconds: number | null
+  price_cents: number | null
   plays: number
   likes_count: number
   downloads_count: number

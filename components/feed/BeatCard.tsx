@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { WaveformPlayer } from '@/components/audio/WaveformPlayer'
+import { PaywallModal } from '@/components/feed/PaywallModal'
 import { useAudio } from '@/hooks/useAudio'
 import { useInteraction } from '@/hooks/useInteraction'
 import type { Beat } from '@/types'
@@ -26,7 +27,17 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
   const playing = isPlaying(beat.id)
   const [showHeart, setShowHeart] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
+  const [paywallOpen, setPaywallOpen] = useState(false)
+  // Ground-truth from WaveSurfer — avoids the iOS race where React state says
+  // "playing" but the browser's autoplay policy actually blocked it.
+  const [actuallyPlaying, setActuallyPlaying] = useState(false)
   const lastTap = useRef(0)
+  // Only initialize WaveSurfer once this card has been the active card.
+  // Prevents N concurrent audio loads for all cards in the DOM at once.
+  const [waveformMounted, setWaveformMounted] = useState(isActive)
+  useEffect(() => {
+    if (isActive && !waveformMounted) setWaveformMounted(true)
+  }, [isActive, waveformMounted])
 
   const interaction = useInteraction({
     beatId: beat.id,
@@ -36,9 +47,9 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
   })
 
   const togglePlay = useCallback(() => {
-    if (playing) pause()
+    if (actuallyPlaying) pause()
     else play(beat.id)
-  }, [playing, play, pause, beat.id])
+  }, [actuallyPlaying, play, pause, beat.id])
 
   // Double-tap to like (TikTok style)
   function handleDoubleTap() {
@@ -111,10 +122,10 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
       <button
         onClick={(e) => { e.stopPropagation(); togglePlay() }}
         className="absolute inset-0 z-10"
-        aria-label={playing ? 'Pause' : 'Play'}
+        aria-label={actuallyPlaying ? 'Pause' : 'Play'}
       >
         <AnimatePresence>
-          {!playing && (
+          {!actuallyPlaying && (
             <motion.div
               className="absolute inset-0 flex items-center justify-center"
               initial={{ opacity: 0, scale: 0.8 }}
@@ -167,11 +178,19 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
           <span className="text-white/70 text-xs font-semibold drop-shadow">Message</span>
         </Link>
 
-        {/* Download */}
+        {/* Download / Buy */}
         <SideAction
           icon={<Download className={`w-6 h-6 ${interaction.downloaded ? 'text-primary' : 'text-white/70'}`} />}
-          label={fmtCount(beat.downloads_count)}
-          onClick={() => interaction.download(beat.audio_url, beat.title)}
+          label={beat.price_cents && beat.price_cents > 0 && !interaction.downloaded
+            ? `$${(beat.price_cents / 100).toFixed(2)}`
+            : fmtCount(beat.downloads_count)}
+          onClick={() => {
+            if (beat.price_cents && beat.price_cents > 0 && !interaction.downloaded) {
+              setPaywallOpen(true)
+            } else {
+              interaction.download(beat.audio_url, beat.title)
+            }
+          }}
           active={interaction.downloaded}
         />
 
@@ -184,8 +203,18 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
         />
 
         {/* Spinning disc — producer avatar */}
-        <SpinningDisc avatarUrl={beat.producer?.avatar_url ?? null} isPlaying={playing} />
+        <SpinningDisc avatarUrl={beat.producer?.avatar_url ?? null} isPlaying={actuallyPlaying} />
       </div>
+
+      {/* ── Paywall modal ──────────────────────────────────────────────── */}
+      {paywallOpen && (
+        <PaywallModal
+          beat={beat}
+          userId={userId}
+          onClose={() => setPaywallOpen(false)}
+          onFreeDownload={() => interaction.download(beat.audio_url, beat.title)}
+        />
+      )}
 
       {/* ── Bottom left: producer + beat info + waveform ───────────────── */}
       <div
@@ -233,14 +262,15 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
           ))}
         </div>
 
-        {/* Waveform strip */}
-        {beat.audio_url && (
+        {/* Waveform strip — only mounted after card has been active */}
+        {beat.audio_url && waveformMounted && (
           <div className="pt-1">
             <WaveformPlayer
               beatId={beat.id}
               audioUrl={beat.audio_url}
               isActive={isActive && playing}
-              onFinish={() => pause()}
+              onFinish={() => { setActuallyPlaying(false); pause() }}
+              onPlayStateChange={setActuallyPlaying}
             />
           </div>
         )}

@@ -23,8 +23,8 @@ export function BottomNav({ username, userId }: { username?: string; userId?: st
   }, [username, router])
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 bg-black/80 backdrop-blur-2xl border-t border-white/8 pb-safe">
-      <div className="flex items-center justify-around px-2 h-14 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 inset-x-0 z-50 bg-[oklch(0.1_0.002_240)]/90 backdrop-blur-3xl border-t border-white/5 pb-safe">
+      <div className="flex items-center justify-around px-2 h-16 max-w-lg mx-auto">
 
         <NavItem href="/feed" active={isActive('/feed')} icon={<Home className="w-6 h-6" />} label="Home" />
         <NavItem href="/discover" active={isActive('/discover')} icon={<Search className="w-6 h-6" />} label="Discover" />
@@ -94,20 +94,20 @@ function NavItem({
       <div
         style={
           active
-            ? { filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.9)) drop-shadow(0 0 3px rgba(255,255,255,0.6))' }
+            ? { filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.45))' }
             : undefined
         }
         className="transition-all duration-200"
       >
         {icon}
       </div>
-      <span className={`text-[10px] font-semibold tracking-wide ${active ? 'text-white' : 'text-white/45'}`}>
+      <span className={`text-[10px] font-semibold tracking-wider uppercase ${active ? 'text-white' : 'text-white/40'}`}>
         {label}
       </span>
       {active && (
         <span
           className="w-4 h-0.5 rounded-full bg-white mt-0.5"
-          style={{ boxShadow: '0 0 8px rgba(255,255,255,0.9), 0 0 3px white' }}
+          style={{ boxShadow: '0 0 6px rgba(255,255,255,0.4)' }}
         />
       )}
     </Link>

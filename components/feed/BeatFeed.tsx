@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BeatCard } from './BeatCard'
 import { useSwipeFeed } from '@/hooks/useSwipeFeed'
 import { useAudio } from '@/hooks/useAudio'
@@ -19,21 +19,21 @@ const LOAD_AHEAD = 4
 function ForYouTabs() {
   const [tab, setTab] = useState<'following' | 'foryou'>('foryou')
   return (
-    <div className="fixed top-0 inset-x-0 z-30 flex items-center justify-center gap-6 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-2 pointer-events-none">
-      <div className="flex items-center gap-6 pointer-events-auto">
+    <div className="fixed top-0 inset-x-0 z-30 flex items-center justify-center pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-2 pointer-events-none">
+      <div className="flex items-center gap-7 pointer-events-auto">
         <button
           onClick={() => setTab('following')}
-          className={`text-[15px] font-semibold transition-colors drop-shadow ${tab === 'following' ? 'text-white' : 'text-white/50'}`}
+          className={`text-sm font-semibold tracking-wide transition-all drop-shadow ${tab === 'following' ? 'text-white' : 'text-white/45'}`}
         >
           Following
         </button>
         <button
           onClick={() => setTab('foryou')}
-          className="relative text-[15px] font-semibold text-white drop-shadow"
+          className="relative text-sm font-semibold tracking-wide text-white drop-shadow"
         >
           For You
           {tab === 'foryou' && (
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-white" />
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-[2px] rounded-full bg-white" />
           )}
         </button>
       </div>
@@ -83,9 +83,11 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
   useEffect(() => { activeIndexRef.current = activeIndex }, [activeIndex])
 
   // Auto-play the active beat + track listen time for the one we just left.
+  // Audio start is debounced 160ms so rapid scrolling doesn't thrash audio.
   useEffect(() => {
     const activeBeat = display[activeIndex]
 
+    // Track listen time immediately (don't debounce — we want accurate numbers)
     const prevId = prevBeatIdRef.current
     const startMs = playStartRef.current
     if (prevId && startMs !== null) {
@@ -98,15 +100,19 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
         }).catch(() => {})
       }
     }
+    prevBeatIdRef.current = null
+    playStartRef.current = null
 
-    if (activeBeat?.audio_url) {
-      play(activeBeat.id)
-      playStartRef.current = Date.now()
-      prevBeatIdRef.current = activeBeat.id
-    } else {
-      playStartRef.current = null
-      prevBeatIdRef.current = null
-    }
+    // Debounce audio start: if user scrolls past quickly, don't start audio
+    const t = setTimeout(() => {
+      if (activeBeat?.audio_url) {
+        play(activeBeat.id)
+        playStartRef.current = Date.now()
+        prevBeatIdRef.current = activeBeat.id
+      }
+    }, 160)
+
+    return () => clearTimeout(t)
   }, [activeIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // After trimming from the front, instantly scroll so the current card
@@ -144,23 +150,27 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
       sourceIndexRef.current = 0
 
       const stamped = stampBeats(chunk, seq.current)
+      const capturedActiveIndex = activeIndexRef.current
 
-      setDisplay((prev) => {
-        const next = [...prev, ...stamped]
-        // Keep at most 2 full loops in the DOM; trim by exactly one loop
-        // so we never cut through the middle of a cycle.
-        const maxDisplay = src.length * 2
-        if (next.length > maxDisplay) {
-          const trim = next.length - maxDisplay
-          pendingJumpRef.current = Math.max(0, activeIndexRef.current - trim)
-          return next.slice(trim)
-        }
-        return next
+      // Non-urgent: extending the feed shouldn't block scroll input
+      startTransition(() => {
+        setDisplay((prev) => {
+          const next = [...prev, ...stamped]
+          // Keep at most 2 full loops in the DOM; trim by exactly one loop
+          // so we never cut through the middle of a cycle.
+          const maxDisplay = src.length * 2
+          if (next.length > maxDisplay) {
+            const trim = next.length - maxDisplay
+            pendingJumpRef.current = Math.max(0, capturedActiveIndex - trim)
+            return next.slice(trim)
+          }
+          return next
+        })
+        // Bump version so useSwipeFeed re-attaches the IntersectionObserver to
+        // the new card elements — without this, count stays the same after a
+        // trim+add and the observer never sees the fresh DOM nodes.
+        setDisplayVersion((v) => v + 1)
       })
-      // Bump version so useSwipeFeed re-attaches the IntersectionObserver to
-      // the new card elements — without this, count stays the same after a
-      // trim+add and the observer never sees the fresh DOM nodes.
-      setDisplayVersion((v) => v + 1)
     } finally {
       extendingRef.current = false
     }

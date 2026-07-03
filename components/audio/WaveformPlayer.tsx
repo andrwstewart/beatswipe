@@ -9,6 +9,7 @@ interface WaveformPlayerProps {
   isActive: boolean
   onReady?: () => void
   onFinish?: () => void
+  onPlayStateChange?: (playing: boolean) => void
 }
 
 export function WaveformPlayer({
@@ -17,6 +18,7 @@ export function WaveformPlayer({
   isActive,
   onReady,
   onFinish,
+  onPlayStateChange,
 }: WaveformPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const wavesurferRef = useRef<import('wavesurfer.js').default | null>(null)
@@ -24,10 +26,13 @@ export function WaveformPlayer({
   const registry = useContext(AudioRegistryContext)
 
   // Tracks whether play() was blocked by the browser's autoplay policy.
-  // On mobile, the first play() before any user gesture is rejected silently.
   const pendingPlayRef = useRef(false)
   const isActiveRef = useRef(isActive)
   useEffect(() => { isActiveRef.current = isActive }, [isActive])
+
+  // Stable ref so the touchstart retry always has the latest callback.
+  const onPlayStateChangeRef = useRef(onPlayStateChange)
+  useEffect(() => { onPlayStateChangeRef.current = onPlayStateChange }, [onPlayStateChange])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -62,15 +67,17 @@ export function WaveformPlayer({
         onReady?.()
       })
 
+      // Emit actual play/pause state so the parent knows whether audio is
+      // truly playing (not just what React state believes).
+      ws.on('play', () => onPlayStateChangeRef.current?.(true))
+      ws.on('pause', () => onPlayStateChangeRef.current?.(false))
+
       ws.on('finish', () => {
-        // Seek back to start so the next play() call (when user returns to this
-        // card) begins from the beginning rather than silently doing nothing at
-        // position 1.0.
         ws.seekTo(0)
+        onPlayStateChangeRef.current?.(false)
         onFinish?.()
       })
 
-      // Register play/pause callbacks with the AudioProvider
       if (registry) {
         const unregister = registry.registerPlayer(beatId, {
           play: () => ws.play(),
@@ -90,17 +97,10 @@ export function WaveformPlayer({
     }
   }, [audioUrl, beatId])
 
-  // Each WaveformPlayer drives its own wavesurfer directly.
-  // AudioProvider.play() only updates activeBeatId state (and pauses the old
-  // beat); it no longer calls the registered play() callback. This ensures only
-  // the visible card's wavesurfer plays — the registered callback slot can point
-  // to the wrong instance when the same beat appears at multiple loop positions.
   useEffect(() => {
     if (!wavesurferRef.current || !ready) return
     if (isActive) {
       const result = wavesurferRef.current.play() as unknown as Promise<void> | void
-      // Mobile browsers block autoplay until the first user gesture. If play()
-      // returns a rejected promise, mark it pending and retry on first touch.
       if (result && typeof (result as Promise<void>).catch === 'function') {
         ;(result as Promise<void>).catch(() => {
           pendingPlayRef.current = true
@@ -112,8 +112,8 @@ export function WaveformPlayer({
     }
   }, [isActive, ready])
 
-  // Retry play on the first user gesture (touchstart/mousedown) so the active
-  // card starts playing the moment the visitor first interacts with the page.
+  // Retry play on the first user gesture. Uses touchend (not touchstart) so
+  // it fires after the swipe completes and the correct card is active.
   useEffect(() => {
     const retryPlay = () => {
       if (pendingPlayRef.current && wavesurferRef.current && isActiveRef.current) {
@@ -121,10 +121,10 @@ export function WaveformPlayer({
         pendingPlayRef.current = false
       }
     }
-    document.addEventListener('touchstart', retryPlay, { passive: true })
+    document.addEventListener('touchend', retryPlay, { passive: true })
     document.addEventListener('mousedown', retryPlay)
     return () => {
-      document.removeEventListener('touchstart', retryPlay)
+      document.removeEventListener('touchend', retryPlay)
       document.removeEventListener('mousedown', retryPlay)
     }
   }, [])

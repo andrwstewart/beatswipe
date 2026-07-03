@@ -43,59 +43,59 @@
 }
 
 :root {
-  --background: oklch(0.08 0 0);
+  --background: oklch(0.1 0.002 240);
   --foreground: oklch(0.97 0 0);
-  --card: oklch(0.12 0 0);
+  --card: oklch(0.14 0.002 240);
   --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.12 0 0);
+  --popover: oklch(0.14 0.002 240);
   --popover-foreground: oklch(0.97 0 0);
   --primary: oklch(0.78 0.22 145);
   --primary-foreground: oklch(0.08 0 0);
-  --secondary: oklch(0.18 0 0);
+  --secondary: oklch(0.19 0.002 240);
   --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.18 0 0);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.18 0 0);
+  --muted: oklch(0.19 0.002 240);
+  --muted-foreground: oklch(0.62 0 0);
+  --accent: oklch(0.19 0.002 240);
   --accent-foreground: oklch(0.97 0 0);
   --destructive: oklch(0.65 0.22 27);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
   --ring: oklch(0.78 0.22 145);
-  --radius: 0.75rem;
+  --radius: 0.875rem;
   --neon: #00ff88;
-  --neon-dim: rgba(0, 255, 136, 0.4);
-  --sidebar: oklch(0.10 0 0);
+  --neon-dim: rgba(0, 255, 136, 0.35);
+  --sidebar: oklch(0.12 0.002 240);
   --sidebar-foreground: oklch(0.97 0 0);
   --sidebar-primary: oklch(0.78 0.22 145);
   --sidebar-primary-foreground: oklch(0.08 0 0);
-  --sidebar-accent: oklch(0.18 0 0);
+  --sidebar-accent: oklch(0.19 0.002 240);
   --sidebar-accent-foreground: oklch(0.97 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.78 0.22 145);
 }
 
 /* Force dark by default — app is dark-only */
 .dark {
-  --background: oklch(0.08 0 0);
+  --background: oklch(0.1 0.002 240);
   --foreground: oklch(0.97 0 0);
-  --card: oklch(0.12 0 0);
+  --card: oklch(0.14 0.002 240);
   --card-foreground: oklch(0.97 0 0);
-  --popover: oklch(0.12 0 0);
+  --popover: oklch(0.14 0.002 240);
   --popover-foreground: oklch(0.97 0 0);
   --primary: oklch(0.78 0.22 145);
   --primary-foreground: oklch(0.08 0 0);
-  --secondary: oklch(0.18 0 0);
+  --secondary: oklch(0.19 0.002 240);
   --secondary-foreground: oklch(0.97 0 0);
-  --muted: oklch(0.18 0 0);
-  --muted-foreground: oklch(0.6 0 0);
-  --accent: oklch(0.18 0 0);
+  --muted: oklch(0.19 0.002 240);
+  --muted-foreground: oklch(0.62 0 0);
+  --accent: oklch(0.19 0.002 240);
   --accent-foreground: oklch(0.97 0 0);
   --destructive: oklch(0.65 0.22 27);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 10%);
   --ring: oklch(0.78 0.22 145);
   --neon: #00ff88;
-  --neon-dim: rgba(0, 255, 136, 0.4);
+  --neon-dim: rgba(0, 255, 136, 0.35);
 }
 
 @layer base {
@@ -105,10 +105,18 @@
   body {
     @apply bg-background text-foreground;
     overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
   }
   html {
     @apply font-sans;
     overscroll-behavior: none;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+    font-weight: 700;
   }
 }
 
@@ -117,9 +125,11 @@
   height: 100dvh;
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
-  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   overscroll-behavior: contain;
+  /* Let the browser use compositor-thread scrolling — no JS on the hot path */
+  -webkit-overflow-scrolling: touch;
+  will-change: scroll-position;
 }
 
 .beat-feed::-webkit-scrollbar {
@@ -132,6 +142,13 @@
   scroll-snap-stop: always;
   position: relative;
   overflow: hidden;
+  contain: layout style paint;
+}
+
+/* Promote background media to its own GPU layer so scroll doesn't repaint it */
+.beat-card > div:first-child {
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 /* Neon glow utilities */
