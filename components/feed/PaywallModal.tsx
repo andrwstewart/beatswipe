@@ -77,7 +77,7 @@ export function PaywallModal({ beat, userId, onClose, onFreeDownload }: PaywallM
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-[100] flex items-end justify-center"
+        className="fixed inset-0 z-[100] flex items-center justify-center px-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -87,10 +87,10 @@ export function PaywallModal({ beat, userId, onClose, onFreeDownload }: PaywallM
 
         {/* Sheet */}
         <motion.div
-          className="relative w-full max-w-lg bg-[oklch(0.14_0.002_240)] rounded-t-3xl border-t border-white/8 p-6 pb-10 space-y-5"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          className="relative w-full max-w-lg bg-[oklch(0.14_0.002_240)] rounded-3xl border border-white/8 p-6 pb-8 space-y-5"
+          initial={{ opacity: 0, scale: 0.95, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 16 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
         >
           {/* Close */}
