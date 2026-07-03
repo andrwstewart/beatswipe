@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
   Upload, Music2, ImageIcon, X, Check, ChevronDown,
-  Loader2, AlertCircle, Sparkles,
+  Loader2, AlertCircle, Sparkles, ExternalLink,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GENRES, KEYS, type Genre, type Key } from '@/types'
@@ -98,6 +98,23 @@ export function BulkUploadForm({ userId }: BulkUploadFormProps) {
   const [defaultCoverPreview, setDefaultCoverPreview] = useState<string | null>(null)
   const [defaultCoverUrl, setDefaultCoverUrl] = useState<string | null>(null)
   const [publishError, setPublishError] = useState<string | null>(null)
+  const [price, setPrice] = useState('')
+  const [stripeConnected, setStripeConnected] = useState(false)
+
+  useEffect(() => {
+    createClient()
+      .from('profiles')
+      .select('stripe_payouts_enabled')
+      .eq('id', userId)
+      .single()
+      .then(({ data }) => { if (data?.stripe_payouts_enabled) setStripeConnected(true) })
+  }, [userId])
+
+  async function connectStripe() {
+    const res = await fetch('/api/stripe/connect/onboard', { method: 'POST' })
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+  }
 
   // ── File selection ───────────────────────────────────────────────────────────
 
@@ -305,6 +322,10 @@ export function BulkUploadForm({ userId }: BulkUploadFormProps) {
             }
           }
 
+          const priceCents = price && parseFloat(price) >= 0.99
+            ? Math.round(parseFloat(price) * 100)
+            : 0
+
           await supabase
             .from('beats')
             .update({
@@ -314,6 +335,7 @@ export function BulkUploadForm({ userId }: BulkUploadFormProps) {
               genre: beat.genres.length > 0 ? beat.genres : null,
               type_beat_tags: beat.typeBeatTags.length > 0 ? beat.typeBeatTags : null,
               cover_url: coverUrl,
+              price_cents: priceCents,
             })
             .eq('id', beat.beatId!)
         })
@@ -382,6 +404,10 @@ export function BulkUploadForm({ userId }: BulkUploadFormProps) {
       defaultCoverPreview={defaultCoverPreview}
       onDefaultCover={handleDefaultCover}
       onStart={startUpload}
+      price={price}
+      onPriceChange={setPrice}
+      stripeConnected={stripeConnected}
+      onConnectStripe={connectStripe}
     />
   )
 }
@@ -395,6 +421,10 @@ function SelectPhase({
   defaultCoverPreview,
   onDefaultCover,
   onStart,
+  price,
+  onPriceChange,
+  stripeConnected,
+  onConnectStripe,
 }: {
   beats: BulkBeat[]
   onAudioFiles: (files: FileList | null) => void
@@ -402,6 +432,10 @@ function SelectPhase({
   defaultCoverPreview: string | null
   onDefaultCover: (file: File | null) => void
   onStart: () => void
+  price: string
+  onPriceChange: (v: string) => void
+  stripeConnected: boolean
+  onConnectStripe: () => void
 }) {
   const remaining = 10 - beats.length
 
@@ -483,6 +517,48 @@ function SelectPhase({
             </button>
           )}
         </label>
+      </div>
+
+      {/* Price — applied to all beats */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">Download price <span className="text-muted-foreground font-normal text-xs">(applied to all beats)</span></p>
+        {!stripeConnected ? (
+          <div className="flex items-center justify-between px-3 py-3 rounded-xl border border-border bg-secondary/40">
+            <div>
+              <p className="text-sm font-medium">Connect Stripe to charge for beats</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Set up payouts to unlock paid downloads</p>
+            </div>
+            <button
+              type="button"
+              onClick={onConnectStripe}
+              className="ml-3 flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium bg-secondary/60 hover:bg-secondary transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              Connect
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+              <input
+                type="number"
+                placeholder="0.00 — leave blank for free"
+                min={0}
+                step={0.01}
+                value={price}
+                onChange={(e) => onPriceChange(e.target.value)}
+                className="w-full bg-secondary/50 border border-border/40 rounded-lg pl-6 pr-3 py-2 text-sm outline-none focus:border-primary/60"
+              />
+            </div>
+            {price && parseFloat(price) > 0 && parseFloat(price) < 0.99 && (
+              <p className="text-xs text-destructive">Minimum paid price is $0.99</p>
+            )}
+            {(!price || parseFloat(price) === 0) && (
+              <p className="text-xs text-muted-foreground">Free download for all artists</p>
+            )}
+          </div>
+        )}
       </div>
 
       <button
