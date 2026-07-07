@@ -7,15 +7,35 @@ interface WaveformPlayerProps {
   beatId: string
   audioUrl: string
   isActive: boolean
+  durationSeconds?: number | null
   onReady?: () => void
   onFinish?: () => void
   onPlayStateChange?: (playing: boolean) => void
+}
+
+// Deterministic fake peaks from beat ID — renders instantly, no audio download needed.
+// WaveSurfer defers audio fetch until play() when peaks are provided.
+function generatePeaks(seed: string, count = 120): [number[], number[]] {
+  let h = 5381
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul((h << 5) + h, 1) ^ seed.charCodeAt(i)) >>> 0
+  }
+  const pos: number[] = []
+  const neg: number[] = []
+  for (let i = 0; i < count; i++) {
+    h = (Math.imul(h, 1664525) + 1013904223) >>> 0
+    const v = (h / 0xffffffff) * 0.85 + 0.1
+    pos.push(v)
+    neg.push(-v * 0.75)
+  }
+  return [pos, neg]
 }
 
 export function WaveformPlayer({
   beatId,
   audioUrl,
   isActive,
+  durationSeconds,
   onReady,
   onFinish,
   onPlayStateChange,
@@ -52,8 +72,10 @@ export function WaveformPlayer({
         barRadius: 3,
         interact: true,
         url: audioUrl,
-        peaks: undefined,
-        duration: undefined,
+        // Pre-generated peaks mean WaveSurfer renders the waveform immediately
+        // without downloading audio. The file is only fetched when play() is called.
+        peaks: generatePeaks(beatId),
+        duration: durationSeconds ?? 180,
         fetchParams: {
           headers: {},
           mode: 'cors',

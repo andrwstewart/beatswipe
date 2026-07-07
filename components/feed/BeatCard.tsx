@@ -269,6 +269,7 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
               beatId={beat.id}
               audioUrl={beat.audio_url}
               isActive={isActive && playing}
+              durationSeconds={beat.duration_seconds}
               onFinish={() => { setActuallyPlaying(false); pause() }}
               onPlayStateChange={setActuallyPlaying}
             />

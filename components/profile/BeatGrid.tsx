@@ -201,6 +201,7 @@ function BeatDetailModal({
                 beatId={beat.id}
                 audioUrl={beat.audio_url}
                 isActive={playing}
+                durationSeconds={beat.duration_seconds}
                 onFinish={pause}
               />
             )}
