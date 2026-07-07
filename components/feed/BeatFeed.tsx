@@ -199,6 +199,7 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
             beat={beat}
             userId={userId}
             isActive={index === activeIndex}
+            isNext={index === activeIndex + 1}
             cardRef={setCardRef(index)}
           />
         ))}

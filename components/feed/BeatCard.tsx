@@ -19,10 +19,11 @@ interface BeatCardProps {
   beat: Beat
   userId: string
   isActive: boolean
+  isNext?: boolean
   cardRef?: (el: HTMLDivElement | null) => void
 }
 
-export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
+export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardProps) {
   const { play, pause, isPlaying } = useAudio()
   const playing = isPlaying(beat.id)
   const [showHeart, setShowHeart] = useState(false)
@@ -74,6 +75,14 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
       pendingPlayRef.current = false
     }
   }, [isActive])
+
+  // Preload the next card's audio while the user is still on the current card.
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !isNext) return
+    audio.preload = 'auto'
+    audio.load()
+  }, [isNext])
 
   // Retry after iOS gesture if first play() was blocked.
   useEffect(() => {
