@@ -1,6 +1,21 @@
 'use client'
 
-import { createContext, useCallback, useRef, useState } from 'react'
+import { createContext, useCallback, useEffect, useRef, useState } from 'react'
+
+// Unlock iOS audio context on first touch so subsequent async audio.play()
+// calls don't require the user to be inside a gesture handler.
+function useIOSAudioUnlock() {
+  useEffect(() => {
+    const unlock = () => {
+      const a = new Audio()
+      // Tiny silent WAV — plays instantly, costs nothing, unlocks iOS audio.
+      a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA='
+      a.play().catch(() => {})
+    }
+    document.addEventListener('touchstart', unlock, { once: true, passive: true })
+    return () => document.removeEventListener('touchstart', unlock)
+  }, [])
+}
 
 interface AudioContextValue {
   activeBeatId: string | null
@@ -11,6 +26,7 @@ interface AudioContextValue {
 export const AudioContext = createContext<AudioContextValue | null>(null)
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
+  useIOSAudioUnlock()
   const [activeBeatId, setActiveBeatId] = useState<string | null>(null)
   // Callbacks registered by each WaveformPlayer to imperatively play/pause
   const playerCallbacks = useRef<Map<string, { play: () => void; pause: () => void }>>(new Map())

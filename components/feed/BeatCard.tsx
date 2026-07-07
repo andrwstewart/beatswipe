@@ -28,12 +28,66 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
   const [showHeart, setShowHeart] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
-  // Ground-truth from WaveSurfer — avoids the iOS race where React state says
-  // "playing" but the browser's autoplay policy actually blocked it.
   const [actuallyPlaying, setActuallyPlaying] = useState(false)
   const lastTap = useRef(0)
-  // Only initialize WaveSurfer once this card has been the active card.
-  // Prevents N concurrent audio loads for all cards in the DOM at once.
+
+  // Audio element lives here so play() fires the instant isActive changes —
+  // no debounce, no AudioContext state chain, no WaveformPlayer render cycle.
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const pendingPlayRef = useRef(false)
+  const isActiveRef = useRef(isActive)
+  useEffect(() => { isActiveRef.current = isActive }, [isActive])
+
+  useEffect(() => {
+    if (!beat.audio_url) return
+    const audio = new Audio()
+    audio.preload = 'none' // no download until the card is active
+    audio.src = beat.audio_url
+    audioRef.current = audio
+
+    const onPlay  = () => setActuallyPlaying(true)
+    const onPause = () => setActuallyPlaying(false)
+    const onEnded = () => { audio.currentTime = 0; setActuallyPlaying(false); pause() }
+    audio.addEventListener('play',  onPlay)
+    audio.addEventListener('pause', onPause)
+    audio.addEventListener('ended', onEnded)
+    return () => {
+      audio.removeEventListener('play',  onPlay)
+      audio.removeEventListener('pause', onPause)
+      audio.removeEventListener('ended', onEnded)
+      audio.pause()
+      audio.removeAttribute('src')
+      audioRef.current = null
+    }
+  }, [beat.audio_url]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Play/pause fires the moment isActive changes — one render cycle after the
+  // IntersectionObserver, no extra debounce or React chain involved.
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (isActive) {
+      audio.preload = 'auto'
+      audio.play().catch(() => { pendingPlayRef.current = true })
+    } else {
+      audio.pause()
+      pendingPlayRef.current = false
+    }
+  }, [isActive])
+
+  // Retry after iOS gesture if first play() was blocked.
+  useEffect(() => {
+    const retry = () => {
+      if (pendingPlayRef.current && audioRef.current && isActiveRef.current) {
+        audioRef.current.play().catch(() => {})
+        pendingPlayRef.current = false
+      }
+    }
+    document.addEventListener('touchend', retry, { passive: true })
+    return () => document.removeEventListener('touchend', retry)
+  }, [])
+
+  // Only mount the WaveSurfer canvas after the card has first been active.
   const [waveformMounted, setWaveformMounted] = useState(isActive)
   useEffect(() => {
     if (isActive && !waveformMounted) setWaveformMounted(true)
@@ -47,9 +101,15 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
   })
 
   const togglePlay = useCallback(() => {
-    if (actuallyPlaying) pause()
-    else play(beat.id)
-  }, [actuallyPlaying, play, pause, beat.id])
+    const audio = audioRef.current
+    if (!audio) return
+    if (actuallyPlaying) {
+      audio.pause()
+    } else {
+      audio.play().catch(() => {})
+      play(beat.id) // keep AudioContext state in sync
+    }
+  }, [actuallyPlaying, play, beat.id])
 
   // Double-tap to like (TikTok style)
   function handleDoubleTap() {
@@ -268,10 +328,8 @@ export function BeatCard({ beat, userId, isActive, cardRef }: BeatCardProps) {
             <WaveformPlayer
               beatId={beat.id}
               audioUrl={beat.audio_url}
-              isActive={isActive && playing}
+              audioRef={audioRef}
               durationSeconds={beat.duration_seconds}
-              onFinish={() => { setActuallyPlaying(false); pause() }}
-              onPlayStateChange={setActuallyPlaying}
             />
           </div>
         )}

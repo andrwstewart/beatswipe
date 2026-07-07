@@ -103,14 +103,15 @@ export function BeatFeed({ initialBeats, userId }: BeatFeedProps) {
     prevBeatIdRef.current = null
     playStartRef.current = null
 
-    // Debounce audio start: if user scrolls past quickly, don't start audio
+    // Short debounce — audio already starts instantly in BeatCard's isActive effect.
+    // This just syncs AudioContext state and starts listen-time tracking.
     const t = setTimeout(() => {
       if (activeBeat?.audio_url) {
         play(activeBeat.id)
         playStartRef.current = Date.now()
         prevBeatIdRef.current = activeBeat.id
       }
-    }, 160)
+    }, 40)
 
     return () => clearTimeout(t)
   }, [activeIndex]) // eslint-disable-line react-hooks/exhaustive-deps
