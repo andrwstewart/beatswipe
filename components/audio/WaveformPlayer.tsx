@@ -42,18 +42,81 @@ export function WaveformPlayer({
 }: WaveformPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const wavesurferRef = useRef<import('wavesurfer.js').default | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [ready, setReady] = useState(false)
   const registry = useContext(AudioRegistryContext)
-
-  // Tracks whether play() was blocked by the browser's autoplay policy.
   const pendingPlayRef = useRef(false)
   const isActiveRef = useRef(isActive)
-  useEffect(() => { isActiveRef.current = isActive }, [isActive])
-
-  // Stable ref so the touchstart retry always has the latest callback.
   const onPlayStateChangeRef = useRef(onPlayStateChange)
-  useEffect(() => { onPlayStateChangeRef.current = onPlayStateChange }, [onPlayStateChange])
+  const onFinishRef = useRef(onFinish)
 
+  useEffect(() => { isActiveRef.current = isActive }, [isActive])
+  useEffect(() => { onPlayStateChangeRef.current = onPlayStateChange }, [onPlayStateChange])
+  useEffect(() => { onFinishRef.current = onFinish }, [onFinish])
+
+  // Create native audio element on mount — starts buffering the file immediately.
+  // Playback is wired directly here so audio starts the moment isActive flips,
+  // without waiting for WaveSurfer to finish initialising.
+  useEffect(() => {
+    const audio = new Audio()
+    audio.preload = 'auto'
+    audio.src = audioUrl
+    audioRef.current = audio
+
+    const onPlay  = () => onPlayStateChangeRef.current?.(true)
+    const onPause = () => onPlayStateChangeRef.current?.(false)
+    const onEnded = () => {
+      audio.currentTime = 0
+      onPlayStateChangeRef.current?.(false)
+      onFinishRef.current?.()
+    }
+
+    audio.addEventListener('play',  onPlay)
+    audio.addEventListener('pause', onPause)
+    audio.addEventListener('ended', onEnded)
+
+    return () => {
+      audio.removeEventListener('play',  onPlay)
+      audio.removeEventListener('pause', onPause)
+      audio.removeEventListener('ended', onEnded)
+      audio.pause()
+      audio.removeAttribute('src')
+      audioRef.current = null
+    }
+  }, [audioUrl])
+
+  // Play/pause native audio the instant isActive changes — no WaveSurfer wait needed.
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (isActive) {
+      const result = audio.play() as Promise<void> | undefined
+      if (result) result.catch(() => { pendingPlayRef.current = true })
+    } else {
+      audio.pause()
+      pendingPlayRef.current = false
+    }
+  }, [isActive])
+
+  // Retry on first user gesture after iOS autoplay block.
+  useEffect(() => {
+    const retry = () => {
+      if (pendingPlayRef.current && audioRef.current && isActiveRef.current) {
+        audioRef.current.play()
+        pendingPlayRef.current = false
+      }
+    }
+    document.addEventListener('touchend', retry, { passive: true })
+    document.addEventListener('mousedown', retry)
+    return () => {
+      document.removeEventListener('touchend', retry)
+      document.removeEventListener('mousedown', retry)
+    }
+  }, [])
+
+  // Init WaveSurfer async, passing the already-playing audio element via `media`.
+  // setSrc() in WaveSurfer returns early when the URL matches (no audio.load() call),
+  // so the playing audio is never interrupted. Waveform syncs to current position.
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -61,6 +124,7 @@ export function WaveformPlayer({
 
     async function init() {
       const WaveSurfer = (await import('wavesurfer.js')).default
+      if (!containerRef.current || !audioRef.current) return
 
       ws = WaveSurfer.create({
         container: containerRef.current!,
@@ -71,15 +135,10 @@ export function WaveformPlayer({
         barGap: 2,
         barRadius: 3,
         interact: true,
+        media: audioRef.current,
         url: audioUrl,
-        // Pre-generated peaks mean WaveSurfer renders the waveform immediately
-        // without downloading audio. The file is only fetched when play() is called.
         peaks: generatePeaks(beatId),
         duration: durationSeconds ?? 180,
-        fetchParams: {
-          headers: {},
-          mode: 'cors',
-        },
       })
 
       wavesurferRef.current = ws
@@ -89,20 +148,12 @@ export function WaveformPlayer({
         onReady?.()
       })
 
-      // Emit actual play/pause state so the parent knows whether audio is
-      // truly playing (not just what React state believes).
-      ws.on('play', () => onPlayStateChangeRef.current?.(true))
-      ws.on('pause', () => onPlayStateChangeRef.current?.(false))
-
-      ws.on('finish', () => {
-        ws.seekTo(0)
-        onPlayStateChangeRef.current?.(false)
-        onFinish?.()
-      })
+      // Reset visual progress bar to start when track finishes.
+      ws.on('finish', () => ws.seekTo(0))
 
       if (registry) {
         const unregister = registry.registerPlayer(beatId, {
-          play: () => ws.play(),
+          play:  () => ws.play(),
           pause: () => ws.pause(),
         })
         return unregister
@@ -117,39 +168,7 @@ export function WaveformPlayer({
         ws?.destroy()
       })
     }
-  }, [audioUrl, beatId])
-
-  useEffect(() => {
-    if (!wavesurferRef.current || !ready) return
-    if (isActive) {
-      const result = wavesurferRef.current.play() as unknown as Promise<void> | void
-      if (result && typeof (result as Promise<void>).catch === 'function') {
-        ;(result as Promise<void>).catch(() => {
-          pendingPlayRef.current = true
-        })
-      }
-    } else {
-      wavesurferRef.current.pause()
-      pendingPlayRef.current = false
-    }
-  }, [isActive, ready])
-
-  // Retry play on the first user gesture. Uses touchend (not touchstart) so
-  // it fires after the swipe completes and the correct card is active.
-  useEffect(() => {
-    const retryPlay = () => {
-      if (pendingPlayRef.current && wavesurferRef.current && isActiveRef.current) {
-        wavesurferRef.current.play()
-        pendingPlayRef.current = false
-      }
-    }
-    document.addEventListener('touchend', retryPlay, { passive: true })
-    document.addEventListener('mousedown', retryPlay)
-    return () => {
-      document.removeEventListener('touchend', retryPlay)
-      document.removeEventListener('mousedown', retryPlay)
-    }
-  }, [])
+  }, [beatId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="w-full px-4">
@@ -165,10 +184,7 @@ export function WaveformPlayer({
               <div
                 key={i}
                 className="w-[2px] bg-white/20 rounded-full animate-pulse"
-                style={{
-                  height: `${h}px`,
-                  animationDelay: `${i * 50}ms`,
-                }}
+                style={{ height: `${h}px`, animationDelay: `${i * 50}ms` }}
               />
             ))}
           </div>
