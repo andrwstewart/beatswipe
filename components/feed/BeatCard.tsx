@@ -1,15 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Heart, MessageCircle, Download, Share2,
-  Play, Pause, Plus, Music2,
+  Play, Plus, Music2,
 } from 'lucide-react'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
-import { WaveformPlayer } from '@/components/audio/WaveformPlayer'
 import { PaywallModal } from '@/components/feed/PaywallModal'
 import { useAudio } from '@/hooks/useAudio'
 import { useInteraction } from '@/hooks/useInteraction'
@@ -23,26 +22,89 @@ interface BeatCardProps {
   cardRef?: (el: HTMLDivElement | null) => void
 }
 
+// Deterministic bar heights from beat ID — same on every render, zero network cost.
+function usePeaks(beatId: string, count = 50): number[] {
+  return useMemo(() => {
+    let h = 5381
+    for (let i = 0; i < beatId.length; i++) {
+      h = (Math.imul((h << 5) + h, 1) ^ beatId.charCodeAt(i)) >>> 0
+    }
+    const bars: number[] = []
+    for (let i = 0; i < count; i++) {
+      h = (Math.imul(h, 1664525) + 1013904223) >>> 0
+      bars.push((h / 0xffffffff) * 0.85 + 0.1)
+    }
+    return bars
+  }, [beatId, count])
+}
+
+// Simple waveform: static bars + real playback progress. No WaveSurfer, no downloads.
+function FeedWaveform({
+  audioRef,
+  beatId,
+  durationSeconds,
+}: {
+  audioRef: React.RefObject<HTMLAudioElement | null>
+  beatId: string
+  durationSeconds?: number | null
+}) {
+  const peaks = usePeaks(beatId)
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    const onTimeUpdate = () => {
+      const dur = audio.duration || durationSeconds || 180
+      if (dur > 0) setProgress(audio.currentTime / dur)
+    }
+    const onSeeked = onTimeUpdate
+    audio.addEventListener('timeupdate', onTimeUpdate)
+    audio.addEventListener('seeked', onSeeked)
+    return () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+      audio.removeEventListener('seeked', onSeeked)
+    }
+  }, [audioRef, durationSeconds])
+
+  return (
+    <div className="w-full flex items-end gap-[2.5px] h-14">
+      {peaks.map((h, i) => (
+        <div
+          key={i}
+          className="flex-1 rounded-full"
+          style={{
+            height: `${Math.round(h * 48)}px`,
+            backgroundColor: (i / peaks.length) < progress
+              ? '#00ff88'
+              : 'rgba(255,255,255,0.2)',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardProps) {
-  const { play, pause, isPlaying } = useAudio()
-  const playing = isPlaying(beat.id)
+  const { play, pause } = useAudio()
   const [showHeart, setShowHeart] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
   const [paywallOpen, setPaywallOpen] = useState(false)
   const [actuallyPlaying, setActuallyPlaying] = useState(false)
   const lastTap = useRef(0)
 
-  // Audio element lives here so play() fires the instant isActive changes —
-  // no debounce, no AudioContext state chain, no WaveformPlayer render cycle.
+  // Audio element lives here — play() fires the instant isActive changes,
+  // no debounce or React chain involved.
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const pendingPlayRef = useRef(false)
   const isActiveRef = useRef(isActive)
   useEffect(() => { isActiveRef.current = isActive }, [isActive])
 
+  // Create audio element on mount with preload=none (no download until needed).
   useEffect(() => {
     if (!beat.audio_url) return
     const audio = new Audio()
-    audio.preload = 'none' // no download until the card is active
+    audio.preload = 'none'
     audio.src = beat.audio_url
     audioRef.current = audio
 
@@ -58,12 +120,12 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
       audio.removeEventListener('ended', onEnded)
       audio.pause()
       audio.removeAttribute('src')
+      audio.load() // abort any in-progress download
       audioRef.current = null
     }
   }, [beat.audio_url]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Play/pause fires the moment isActive changes — one render cycle after the
-  // IntersectionObserver, no extra debounce or React chain involved.
+  // Instant play/pause — one render cycle after IntersectionObserver, no extra chain.
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -76,15 +138,25 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
     }
   }, [isActive])
 
-  // Preload the next card's audio while the user is still on the current card.
+  // Preload next card while current is playing.
+  // Cancel the download the moment this card is no longer next or active.
   useEffect(() => {
     const audio = audioRef.current
-    if (!audio || !isNext) return
-    audio.preload = 'auto'
-    audio.load()
-  }, [isNext])
+    if (!audio) return
+    if (isNext && !isActive) {
+      audio.preload = 'auto'
+      audio.load()
+    } else if (!isActive) {
+      // Abort — saves bandwidth and avoids hitting connection limits
+      audio.preload = 'none'
+      const src = audio.src
+      audio.removeAttribute('src')
+      audio.load() // cancels the pending fetch
+      audio.src = src // restore src without triggering download
+    }
+  }, [isNext, isActive])
 
-  // Retry after iOS gesture if first play() was blocked.
+  // Retry play on next gesture if iOS blocked the first attempt.
   useEffect(() => {
     const retry = () => {
       if (pendingPlayRef.current && audioRef.current && isActiveRef.current) {
@@ -95,12 +167,6 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
     document.addEventListener('touchend', retry, { passive: true })
     return () => document.removeEventListener('touchend', retry)
   }, [])
-
-  // Only mount the WaveSurfer canvas after the card has first been active.
-  const [waveformMounted, setWaveformMounted] = useState(isActive)
-  useEffect(() => {
-    if (isActive && !waveformMounted) setWaveformMounted(true)
-  }, [isActive, waveformMounted])
 
   const interaction = useInteraction({
     beatId: beat.id,
@@ -116,11 +182,10 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
       audio.pause()
     } else {
       audio.play().catch(() => {})
-      play(beat.id) // keep AudioContext state in sync
+      play(beat.id)
     }
   }, [actuallyPlaying, play, beat.id])
 
-  // Double-tap to like (TikTok style)
   function handleDoubleTap() {
     const now = Date.now()
     if (now - lastTap.current < 300) {
@@ -148,7 +213,7 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
   return (
     <div ref={cardRef} className="beat-card select-none" onClick={handleDoubleTap}>
 
-      {/* ── Background ─────────────────────────────────────────────────── */}
+      {/* Background */}
       <div className="absolute inset-0 bg-zinc-950">
         {beat.video_url ? (
           <video
@@ -168,11 +233,10 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900" />
         )}
-        {/* Gradient: dark top + dark bottom */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent via-50% to-black/75" />
       </div>
 
-      {/* ── Double-tap heart burst ──────────────────────────────────────── */}
+      {/* Double-tap heart burst */}
       <AnimatePresence>
         {showHeart && (
           <motion.div
@@ -187,7 +251,7 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
         )}
       </AnimatePresence>
 
-      {/* ── Play/pause tap (center area only, avoids UI elements) ──────── */}
+      {/* Play/pause tap */}
       <button
         onClick={(e) => { e.stopPropagation(); togglePlay() }}
         className="absolute inset-0 z-10"
@@ -210,13 +274,12 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
         </AnimatePresence>
       </button>
 
-      {/* ── Right side actions ─────────────────────────────────────────── */}
+      {/* Right side actions */}
       <div
         className="absolute right-3 z-20 flex flex-col items-center gap-4"
         style={{ bottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Producer avatar */}
         <Link href={`/profile/${producerUsername}`} className="relative mb-1">
           <div className="w-11 h-11 rounded-full bg-black/50 backdrop-blur-md border-2 border-white/20 overflow-hidden">
             <Avatar className="w-full h-full">
@@ -231,7 +294,6 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           </div>
         </Link>
 
-        {/* Like */}
         <SideAction
           icon={<Heart className={`w-7 h-7 ${interaction.liked ? 'fill-rose-500 text-rose-500' : 'text-white/70'}`} />}
           label={fmtCount(interaction.likesCount)}
@@ -239,7 +301,6 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           active={interaction.liked}
         />
 
-        {/* Message producer */}
         <Link href={`/messages/new?producer=${producerUsername}`} className="flex flex-col items-center gap-1">
           <div className="p-1">
             <MessageCircle className="w-7 h-7 text-white/70" />
@@ -247,7 +308,6 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           <span className="text-white/70 text-xs font-semibold drop-shadow">Message</span>
         </Link>
 
-        {/* Download / Buy */}
         <SideAction
           icon={<Download className={`w-6 h-6 ${interaction.downloaded ? 'text-primary' : 'text-white/70'}`} />}
           label={beat.price_cents && beat.price_cents > 0 && !interaction.downloaded
@@ -263,7 +323,6 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           active={interaction.downloaded}
         />
 
-        {/* Share */}
         <SideAction
           icon={<Share2 className="w-6 h-6 text-white/70" />}
           label="Share"
@@ -271,11 +330,9 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           active={false}
         />
 
-        {/* Spinning disc — producer avatar */}
         <SpinningDisc avatarUrl={beat.producer?.avatar_url ?? null} isPlaying={actuallyPlaying} />
       </div>
 
-      {/* ── Paywall modal ──────────────────────────────────────────────── */}
       {paywallOpen && (
         <PaywallModal
           beat={beat}
@@ -285,21 +342,18 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
         />
       )}
 
-      {/* ── Bottom left: producer + beat info + waveform ───────────────── */}
+      {/* Bottom left info */}
       <div
         className="absolute left-3 right-20 z-20 space-y-1.5"
         style={{ bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Producer name */}
         <Link href={`/profile/${producerUsername}`}>
           <p className="text-white font-bold text-[15px] drop-shadow">@{producerUsername}</p>
         </Link>
 
-        {/* Beat title */}
         <p className="text-white font-semibold text-lg leading-tight drop-shadow">{beat.title}</p>
 
-        {/* Description (tap to expand) */}
         {beat.description && (
           <p
             className={`text-white/80 text-sm leading-snug drop-shadow ${!descExpanded ? 'line-clamp-2' : ''}`}
@@ -312,7 +366,6 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           </p>
         )}
 
-        {/* Tags row */}
         <div className="flex items-center gap-2 flex-wrap">
           {beat.bpm && (
             <span className="text-white/70 text-xs font-mono bg-white/10 px-2 py-0.5 rounded-full">
@@ -331,24 +384,20 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           ))}
         </div>
 
-        {/* Waveform strip — only mounted after card has been active */}
-        {beat.audio_url && waveformMounted && (
+        {/* Waveform — CSS bars + real progress, no WaveSurfer, no downloads */}
+        {beat.audio_url && (
           <div className="pt-1">
-            <WaveformPlayer
-              beatId={beat.id}
-              audioUrl={beat.audio_url}
+            <FeedWaveform
               audioRef={audioRef}
+              beatId={beat.id}
               durationSeconds={beat.duration_seconds}
             />
           </div>
         )}
 
-        {/* Beat credits line */}
         <div className="flex items-center gap-1.5 text-white/70 text-xs">
           <Music2 className="w-3 h-3 flex-shrink-0" />
-          <span className="truncate">
-            {beat.title} — {producerName}
-          </span>
+          <span className="truncate">{beat.title} — {producerName}</span>
         </div>
       </div>
 
@@ -356,41 +405,26 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
   )
 }
 
-// ── Side action button ────────────────────────────────────────────────────────
-function SideAction({
-  icon, label, onClick, active,
-}: {
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-  active: boolean
+function SideAction({ icon, label, onClick, active }: {
+  icon: React.ReactNode; label: string; onClick: () => void; active: boolean
 }) {
   return (
-    <motion.button
-      whileTap={{ scale: 0.8 }}
-      onClick={onClick}
-      className="flex flex-col items-center gap-1"
-    >
+    <motion.button whileTap={{ scale: 0.8 }} onClick={onClick} className="flex flex-col items-center gap-1">
       <div className={`p-1 transition-transform ${active ? 'scale-110' : ''}`}>{icon}</div>
       <span className="text-white/70 text-xs font-semibold drop-shadow">{label}</span>
     </motion.button>
   )
 }
 
-// ── Spinning disc — producer avatar ──────────────────────────────────────────
 function SpinningDisc({ avatarUrl, isPlaying }: { avatarUrl: string | null; isPlaying: boolean }) {
   return (
     <div
       className={`mt-1 w-10 h-10 rounded-full border-2 border-white/20 bg-zinc-800 overflow-hidden shadow-lg relative ${isPlaying ? 'animate-spin' : ''}`}
       style={{ animationDuration: '4s' }}
     >
-      {avatarUrl ? (
-        <Image src={avatarUrl} alt="producer" fill className="object-cover" sizes="40px" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <Music2 className="w-4 h-4 text-white/60" />
-        </div>
-      )}
+      {avatarUrl
+        ? <Image src={avatarUrl} alt="producer" fill className="object-cover" sizes="40px" />
+        : <div className="w-full h-full flex items-center justify-center"><Music2 className="w-4 h-4 text-white/60" /></div>}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-2.5 h-2.5 rounded-full bg-zinc-900 border border-white/20" />
       </div>

@@ -6,9 +6,6 @@ import { AudioRegistryContext } from './AudioProvider'
 interface WaveformPlayerProps {
   beatId: string
   audioUrl: string
-  // When provided (BeatCard), audio is managed externally — WaveformPlayer is visuals only.
-  // When absent (BeatGrid), WaveformPlayer creates and controls its own audio element.
-  audioRef?: React.MutableRefObject<HTMLAudioElement | null>
   isActive?: boolean
   durationSeconds?: number | null
   onReady?: () => void
@@ -16,8 +13,7 @@ interface WaveformPlayerProps {
   onPlayStateChange?: (playing: boolean) => void
 }
 
-// Decorative peaks seeded from beat ID — render instantly with no network request.
-// Replaced by real decoded peaks ~1.5s after the card becomes active.
+// Decorative peaks seeded from beat ID — instant render, no network cost.
 function generatePeaks(seed: string, count = 120): [number[], number[]] {
   let h = 5381
   for (let i = 0; i < seed.length; i++) {
@@ -37,7 +33,6 @@ function generatePeaks(seed: string, count = 120): [number[], number[]] {
 export function WaveformPlayer({
   beatId,
   audioUrl,
-  audioRef: externalAudioRef,
   isActive,
   durationSeconds,
   onReady,
@@ -46,8 +41,7 @@ export function WaveformPlayer({
 }: WaveformPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const wavesurferRef = useRef<import('wavesurfer.js').default | null>(null)
-  // Only used in self-managed mode (BeatGrid — no externalAudioRef).
-  const ownAudioRef = useRef<HTMLAudioElement | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [ready, setReady] = useState(false)
   const registry = useContext(AudioRegistryContext)
   const pendingPlayRef = useRef(false)
@@ -59,15 +53,12 @@ export function WaveformPlayer({
   useEffect(() => { onPlayStateChangeRef.current = onPlayStateChange }, [onPlayStateChange])
   useEffect(() => { onFinishRef.current = onFinish }, [onFinish])
 
-  // ── Self-managed audio (BeatGrid / profile modal only) ───────────────────────
-  // Skipped entirely when externalAudioRef is provided (BeatCard handles audio).
+  // Self-managed audio element.
   useEffect(() => {
-    if (externalAudioRef) return
-
     const audio = new Audio()
     audio.preload = 'auto'
     audio.src = audioUrl
-    ownAudioRef.current = audio
+    audioRef.current = audio
 
     const onPlay  = () => onPlayStateChangeRef.current?.(true)
     const onPause = () => onPlayStateChangeRef.current?.(false)
@@ -85,13 +76,13 @@ export function WaveformPlayer({
       audio.removeEventListener('ended', onEnded)
       audio.pause()
       audio.removeAttribute('src')
-      ownAudioRef.current = null
+      audioRef.current = null
     }
-  }, [audioUrl, externalAudioRef])
+  }, [audioUrl])
 
+  // Play/pause in response to isActive.
   useEffect(() => {
-    if (externalAudioRef) return
-    const audio = ownAudioRef.current
+    const audio = audioRef.current
     if (!audio) return
     if (isActive) {
       const r = audio.play() as Promise<void> | undefined
@@ -100,13 +91,13 @@ export function WaveformPlayer({
       audio.pause()
       pendingPlayRef.current = false
     }
-  }, [isActive, externalAudioRef])
+  }, [isActive])
 
+  // iOS retry on next gesture.
   useEffect(() => {
-    if (externalAudioRef) return
     const retry = () => {
-      if (pendingPlayRef.current && ownAudioRef.current && isActiveRef.current) {
-        ownAudioRef.current.play()
+      if (pendingPlayRef.current && audioRef.current && isActiveRef.current) {
+        audioRef.current.play()
         pendingPlayRef.current = false
       }
     }
@@ -116,22 +107,17 @@ export function WaveformPlayer({
       document.removeEventListener('touchend', retry)
       document.removeEventListener('mousedown', retry)
     }
-  }, [externalAudioRef])
+  }, [])
 
-  // ── WaveSurfer (visual waveform) — used in both modes ───────────────────────
+  // WaveSurfer — fake peaks only, no secondary audio decode fetch.
   useEffect(() => {
     if (!containerRef.current) return
 
     let ws: import('wavesurfer.js').default
-    let realPeaksTimer: ReturnType<typeof setTimeout> | null = null
 
     async function init() {
       const WaveSurfer = (await import('wavesurfer.js')).default
-      if (!containerRef.current) return
-
-      // Use the external audio element (BeatCard) or our own (BeatGrid).
-      const mediaEl = externalAudioRef ? externalAudioRef.current : ownAudioRef.current
-      if (!mediaEl) return
+      if (!containerRef.current || !audioRef.current) return
 
       ws = WaveSurfer.create({
         container: containerRef.current!,
@@ -142,8 +128,7 @@ export function WaveformPlayer({
         barGap: 2,
         barRadius: 3,
         interact: true,
-        media: mediaEl,
-        url: audioUrl,
+        media: audioRef.current,
         peaks: generatePeaks(beatId),
         duration: durationSeconds ?? 180,
       })
@@ -153,15 +138,6 @@ export function WaveformPlayer({
       ws.on('ready', () => {
         setReady(true)
         onReady?.()
-
-        // After fake peaks are showing, load real waveform in background.
-        // 1.5s delay ensures audio playback has started before we add a
-        // competing decode request.
-        realPeaksTimer = setTimeout(() => {
-          if (wavesurferRef.current === ws) {
-            ws.load(audioUrl).catch(() => {})
-          }
-        }, 1500)
       })
 
       ws.on('finish', () => ws.seekTo(0))
@@ -178,7 +154,6 @@ export function WaveformPlayer({
     const cleanupPromise = init()
 
     return () => {
-      if (realPeaksTimer !== null) clearTimeout(realPeaksTimer)
       cleanupPromise.then((unregister) => {
         unregister?.()
         wavesurferRef.current = null
