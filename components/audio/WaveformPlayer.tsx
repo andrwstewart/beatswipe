@@ -13,6 +13,23 @@ interface WaveformPlayerProps {
   onPlayStateChange?: (playing: boolean) => void
 }
 
+// Decorative peaks seeded from beat ID — render instantly with no network request.
+// Replaced by real decoded peaks ~1.5s after the card becomes active.
+function generatePeaks(seed: string, count = 120): [number[], number[]] {
+  let h = 5381
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul((h << 5) + h, 1) ^ seed.charCodeAt(i)) >>> 0
+  }
+  const pos: number[] = []
+  const neg: number[] = []
+  for (let i = 0; i < count; i++) {
+    h = (Math.imul(h, 1664525) + 1013904223) >>> 0
+    const v = (h / 0xffffffff) * 0.85 + 0.1
+    pos.push(v)
+    neg.push(-v * 0.75)
+  }
+  return [pos, neg]
+}
 
 export function WaveformPlayer({
   beatId,
@@ -37,9 +54,9 @@ export function WaveformPlayer({
   useEffect(() => { onPlayStateChangeRef.current = onPlayStateChange }, [onPlayStateChange])
   useEffect(() => { onFinishRef.current = onFinish }, [onFinish])
 
-  // Create native audio element on mount — starts buffering the file immediately.
-  // Playback is wired directly here so audio starts the moment isActive flips,
-  // without waiting for WaveSurfer to finish initialising.
+  // Create native audio element on mount — starts buffering immediately.
+  // Play/pause runs directly here so audio starts the instant isActive flips,
+  // with no dependency on WaveSurfer being ready.
   useEffect(() => {
     const audio = new Audio()
     audio.preload = 'auto'
@@ -53,7 +70,6 @@ export function WaveformPlayer({
       onPlayStateChangeRef.current?.(false)
       onFinishRef.current?.()
     }
-
     audio.addEventListener('play',  onPlay)
     audio.addEventListener('pause', onPause)
     audio.addEventListener('ended', onEnded)
@@ -68,7 +84,7 @@ export function WaveformPlayer({
     }
   }, [audioUrl])
 
-  // Play/pause native audio the instant isActive changes — no WaveSurfer wait needed.
+  // Play/pause the instant isActive changes — fires before WaveSurfer is ready.
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -97,13 +113,15 @@ export function WaveformPlayer({
     }
   }, [])
 
-  // Init WaveSurfer async, passing the already-playing audio element via `media`.
-  // setSrc() in WaveSurfer returns early when the URL matches (no audio.load() call),
-  // so the playing audio is never interrupted. Waveform syncs to current position.
+  // Init WaveSurfer with the existing audio element (media option) and fake peaks.
+  // Fake peaks render the waveform shape instantly — no network request needed.
+  // After 1.5s the real audio has had time to buffer, so we reload with the actual
+  // decoded peaks without competing with playback for bandwidth.
   useEffect(() => {
     if (!containerRef.current) return
 
     let ws: import('wavesurfer.js').default
+    let realPeaksTimer: ReturnType<typeof setTimeout> | null = null
 
     async function init() {
       const WaveSurfer = (await import('wavesurfer.js')).default
@@ -120,8 +138,8 @@ export function WaveformPlayer({
         interact: true,
         media: audioRef.current,
         url: audioUrl,
-        // No peaks — WaveSurfer fetches and decodes the real audio in the background.
-        // Audio is already playing via the native element above, so this is non-blocking.
+        peaks: generatePeaks(beatId),
+        duration: durationSeconds ?? 180,
       })
 
       wavesurferRef.current = ws
@@ -129,9 +147,16 @@ export function WaveformPlayer({
       ws.on('ready', () => {
         setReady(true)
         onReady?.()
+
+        // Load real waveform after audio has had time to buffer.
+        // Staggering the decode request avoids competing for bandwidth at playback start.
+        realPeaksTimer = setTimeout(() => {
+          if (wavesurferRef.current === ws) {
+            ws.load(audioUrl).catch(() => {})
+          }
+        }, 1500)
       })
 
-      // Reset visual progress bar to start when track finishes.
       ws.on('finish', () => ws.seekTo(0))
 
       if (registry) {
@@ -146,8 +171,10 @@ export function WaveformPlayer({
     const cleanupPromise = init()
 
     return () => {
+      if (realPeaksTimer !== null) clearTimeout(realPeaksTimer)
       cleanupPromise.then((unregister) => {
         unregister?.()
+        wavesurferRef.current = null
         ws?.destroy()
       })
     }
