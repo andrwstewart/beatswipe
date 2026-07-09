@@ -39,6 +39,7 @@ function usePeaks(beatId: string, count = 50): number[] {
 }
 
 // Simple waveform: static bars + real playback progress. No WaveSurfer, no downloads.
+// Tap/click anywhere on the bar to seek — just sets audio.currentTime, no re-fetch or decode.
 function FeedWaveform({
   audioRef,
   beatId,
@@ -50,6 +51,7 @@ function FeedWaveform({
 }) {
   const peaks = usePeaks(beatId)
   const [progress, setProgress] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const audio = audioRef.current
@@ -67,12 +69,28 @@ function FeedWaveform({
     }
   }, [audioRef, durationSeconds])
 
+  const seekToPointer = useCallback((clientX: number) => {
+    const audio = audioRef.current
+    const container = containerRef.current
+    if (!audio || !container) return
+    const dur = audio.duration || durationSeconds
+    if (!dur) return
+    const rect = container.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
+    audio.currentTime = ratio * dur
+    setProgress(ratio)
+  }, [audioRef, durationSeconds])
+
   return (
-    <div className="w-full flex items-end gap-[2.5px] h-14">
+    <div
+      ref={containerRef}
+      onClick={(e) => { e.stopPropagation(); seekToPointer(e.clientX) }}
+      className="w-full flex items-end gap-[2.5px] h-14 cursor-pointer"
+    >
       {peaks.map((h, i) => (
         <div
           key={i}
-          className="flex-1 rounded-full"
+          className="flex-1 rounded-full pointer-events-none"
           style={{
             height: `${Math.round(h * 48)}px`,
             backgroundColor: (i / peaks.length) < progress
