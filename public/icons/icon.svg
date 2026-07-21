@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="230" fill="#000000"/>
+
+  <!-- Waveform bars centered, accent color #00ff88 -->
+  <rect x="184" y="412" width="60" height="200" rx="30" fill="#00ff88"/>
+  <rect x="272" y="340" width="60" height="344" rx="30" fill="#00ff88"/>
+  <rect x="360" y="280" width="60" height="464" rx="30" fill="#00ff88"/>
+  <rect x="448" y="220" width="60" height="584" rx="30" fill="#00ff88"/>
+  <rect x="536" y="280" width="60" height="464" rx="30" fill="#00ff88"/>
+  <rect x="624" y="340" width="60" height="344" rx="30" fill="#00ff88"/>
+  <rect x="712" y="412" width="60" height="200" rx="30" fill="#00ff88"/>
+  <rect x="800" y="460" width="60" height="104" rx="30" fill="#00ff88"/>
+</svg>

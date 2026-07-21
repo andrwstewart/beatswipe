@@ -12,6 +12,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { PaywallModal } from '@/components/feed/PaywallModal'
 import { useAudio } from '@/hooks/useAudio'
 import { useInteraction } from '@/hooks/useInteraction'
+import { hapticImpact, hapticNotification, nativeShare } from '@/lib/native'
 import type { Beat } from '@/types'
 
 interface BeatCardProps {
@@ -209,6 +210,7 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
     if (now - lastTap.current < 300) {
       if (!interaction.liked) {
         interaction.like()
+        hapticNotification('success')
         setShowHeart(true)
         setTimeout(() => setShowHeart(false), 900)
       }
@@ -217,11 +219,8 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
   }
 
   async function handleShare() {
-    if (navigator.share) {
-      await navigator.share({ title: beat.title, url: window.location.href })
-    } else {
-      await navigator.clipboard.writeText(window.location.href)
-    }
+    hapticImpact('light')
+    await nativeShare({ title: beat.title, url: window.location.href })
   }
 
   const producerName = beat.producer?.display_name ?? beat.producer?.username ?? 'Unknown'
@@ -315,7 +314,7 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
         <SideAction
           icon={<Heart className={`w-7 h-7 ${interaction.liked ? 'fill-rose-500 text-rose-500' : 'text-white/70'}`} />}
           label={fmtCount(interaction.likesCount)}
-          onClick={interaction.like}
+          onClick={() => { hapticNotification('success'); interaction.like() }}
           active={interaction.liked}
         />
 
@@ -332,6 +331,7 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
             ? `$${(beat.price_cents / 100).toFixed(2)}`
             : fmtCount(beat.downloads_count)}
           onClick={() => {
+            hapticImpact('medium')
             if (beat.price_cents && beat.price_cents > 0 && !interaction.downloaded) {
               setPaywallOpen(true)
             } else {
