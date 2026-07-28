@@ -139,16 +139,18 @@ export function ChatWindow({
         <Link href="/messages" className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <Avatar className="w-9 h-9">
-          <AvatarImage src={otherUser.avatar_url ?? undefined} />
-          <AvatarFallback className="bg-primary/20 text-primary text-sm font-bold">
-            {displayName[0]?.toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1 min-w-0">
+        <Link href={`/profile/${otherUser.username}`}>
+          <Avatar className="w-9 h-9">
+            <AvatarImage src={otherUser.avatar_url ?? undefined} />
+            <AvatarFallback className="bg-primary/20 text-primary text-sm font-bold">
+              {displayName[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </Link>
+        <Link href={`/profile/${otherUser.username}`} className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate">{displayName}</p>
           <p className="text-xs text-muted-foreground">@{otherUser.username}</p>
-        </div>
+        </Link>
       </div>
 
       {/* Messages */}

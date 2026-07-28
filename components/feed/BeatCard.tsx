@@ -413,9 +413,14 @@ export function BeatCard({ beat, userId, isActive, isNext, cardRef }: BeatCardPr
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 text-white/70 text-xs">
-          <Music2 className="w-3 h-3 flex-shrink-0" />
-          <span className="truncate">{beat.title} — {producerName}</span>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-white/70 text-xs min-w-0">
+            <Music2 className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{beat.title} — {producerName}</span>
+          </div>
+          <span className="text-white/35 text-[11px] font-normal flex-shrink-0">
+            {fmtDate(beat.created_at)}
+          </span>
         </div>
       </div>
 
@@ -453,4 +458,16 @@ function SpinningDisc({ avatarUrl, isPlaying }: { avatarUrl: string | null; isPl
 function fmtCount(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
   return String(n)
+}
+
+function fmtDate(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins  = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days  = Math.floor(diff / 86_400_000)
+  if (mins < 60)   return `${mins}m ago`
+  if (hours < 24)  return `${hours}h ago`
+  if (days < 7)    return `${days}d ago`
+  if (days < 365)  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
